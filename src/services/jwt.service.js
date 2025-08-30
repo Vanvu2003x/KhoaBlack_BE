@@ -3,18 +3,19 @@ const jwt = require('jsonwebtoken');
 
 const SECRET_KEY = process.env.JWT_SECRET_KEY;
 
-// Hàm tạo token
 function generateToken(user) {
     const payload = {
         id: user.id,
         email: user.email,
+        name: user.name,
+        role: user.role,
+        balance : user.balance
     };
 
-    const token = jwt.sign(payload, SECRET_KEY, { expiresIn: '1h' });
+    const token = jwt.sign(payload, SECRET_KEY);
     return token;
 }
 
-// Hàm giải mã và xác thực token
 function verifyToken(token) {
     try {
         const decoded = jwt.verify(token, SECRET_KEY);
