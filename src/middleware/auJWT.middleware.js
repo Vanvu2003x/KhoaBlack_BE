@@ -1,16 +1,24 @@
-const { checkRole } = require("../models/user.model");
+const UserService = require("../modules/user/user.service");
 const { verifyToken } = require("../services/jwt.service");
 
 // Middleware 1: Chỉ kiểm tra token (dùng cho các route cần xác thực nhưng không cần phân quyền)
 const checkToken = (req, res, next) => {
+  let token;
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+
+  if (req.cookies && req.cookies.token) {
+    token = req.cookies.token;
+  } else if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.split(" ")[1];
+  }
+
+  if (!token) {
     return res
       .status(401)
       .json({ message: "Token không hợp lệ hoặc không tồn tại" });
   }
 
-  const token = authHeader.split(" ")[1];
+  // const token = authHeader.split(" ")[1]; // Removed as we handle it above
   try {
     const tokenResult = verifyToken(token);
 
@@ -29,14 +37,22 @@ const checkToken = (req, res, next) => {
 
 // Middleware 2: Kiểm tra quyền admin (nếu không phải admin => chặn)
 const checkRoleMDW = async (req, res, next) => {
+  let token;
   const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+
+  if (req.cookies && req.cookies.token) {
+    token = req.cookies.token;
+  } else if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.split(" ")[1];
+  }
+
+  if (!token) {
     return res
       .status(401)
       .json({ message: "Token không hợp lệ hoặc không tồn tại" });
   }
 
-  const token = authHeader.split(" ")[1];
+  // const token = authHeader.split(" ")[1];
 
   try {
     const tokenResult = verifyToken(token);
@@ -44,22 +60,23 @@ const checkRoleMDW = async (req, res, next) => {
       return res.status(403).json({ message: "Token không hợp lệ" });
     }
 
-    const user = tokenResult.decoded;
+    const userDecoded = tokenResult.decoded;
     let isAdmin = false;
     try {
-      isAdmin = await checkRole(user.id);
+      const user = await UserService.getUserById(userDecoded.id);
+      if (user && user.role === 'admin') {
+        isAdmin = true;
+      }
     } catch (err) {
       console.error("Lỗi khi kiểm tra quyền:", err);
-      return res
-        .status(500)
-        .json({ message: "Lỗi máy chủ khi kiểm tra quyền" });
+      // Fallthrough to forbidden
     }
 
     if (!isAdmin) {
       return res.status(403).json({ message: "Không đủ quyền hạn" });
     }
 
-    req.user = user;
+    req.user = userDecoded; // Or fetch full user? Original decoded is just JWT payload.
     next();
   } catch (error) {
     console.error("Lỗi middleware checkRoleMDW:", error);
@@ -70,15 +87,22 @@ const checkRoleMDW = async (req, res, next) => {
 };
 
 const checkIsAdmin = async (req, res, next) => {
+  let token;
   const authHeader = req.headers.authorization;
 
   req.isAdmin = false;
 
-  if (!authHeader || !authHeader.startsWith("Bearer ")) {
-    return next(); 
+  if (req.cookies && req.cookies.token) {
+    token = req.cookies.token;
+  } else if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.split(" ")[1];
   }
 
-  const token = authHeader.split(" ")[1];
+  if (!token) {
+    return next();
+  }
+
+  // const token = authHeader.split(" ")[1];
 
   try {
     const tokenResult = verifyToken(token);
@@ -92,8 +116,10 @@ const checkIsAdmin = async (req, res, next) => {
     // Gán user vào req nếu cần
     req.user = tokenResult.decoded;
 
-    const isAdmin = await checkRole(userId);
-    req.isAdmin = !!isAdmin;
+    const user = await UserService.getUserById(userId);
+    if (user && user.role === 'admin') {
+      req.isAdmin = true;
+    }
   } catch (err) {
     console.error("❌ Lỗi khi kiểm tra quyền admin:", err);
   }
