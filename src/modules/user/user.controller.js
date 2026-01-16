@@ -32,6 +32,11 @@ const UserController = {
         const { role, keyword } = req.query;
         const result = await UserService.searchUser(role, keyword);
         return res.json(result);
+    }),
+
+    toggleUserLock: asyncHandler(async (req, res) => {
+        const result = await UserService.toggleUserLock(req.params.id);
+        return res.json(result);
     })
 };
 

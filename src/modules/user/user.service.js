@@ -182,8 +182,9 @@ const UserService = {
             updated_at: users.updated_at,
             so_don_order: sql`COALESCE((SELECT COUNT(*) FROM orders WHERE orders.user_id = ${users.id}), 0)`,
             so_don_da_nap: sql`COALESCE((SELECT COUNT(*) FROM orders WHERE orders.user_id_nap = ${users.id} AND orders.status = 'success'), 0)`,
-            tong_amount: sql`COALESCE((SELECT SUM(amount) FROM topup_wallet_logs WHERE topup_wallet_logs.user_id = ${users.id} AND topup_wallet_logs.status = 'Thành Công'), 0)`
+            tong_amount: sql`COALESCE((SELECT SUM(amount) FROM topup_wallet_logs WHERE topup_wallet_logs.user_id = ${users.id} AND topup_wallet_logs.status = ${'Thành Công'}), 0)`
         }).from(users).where(sql`1=1`);
+
 
         if (role) {
             query.where(eq(users.role, role));
@@ -196,6 +197,37 @@ const UserService = {
 
         const result = await query;
         return { success: true, users: result };
+    },
+
+    toggleUserLock: async (userId) => {
+        if (!userId) {
+            throw { status: 400, message: "Thiếu user ID" };
+        }
+
+        const [user] = await db.select().from(users).where(eq(users.id, userId));
+
+        if (!user) {
+            throw { status: 404, message: "Không tìm thấy người dùng" };
+        }
+
+        // Cannot lock admin accounts
+        if (user.role === 'admin') {
+            throw { status: 403, message: "Không thể khóa tài khoản admin" };
+        }
+
+        // Use status field: 'banned' = locked, 'active' = unlocked
+        const newStatus = user.status === 'banned' ? 'active' : 'banned';
+        const isLocked = newStatus === 'banned';
+
+        await db.update(users)
+            .set({ status: newStatus })
+            .where(eq(users.id, userId));
+
+        return {
+            success: true,
+            locked: isLocked,
+            message: isLocked ? "Đã khóa tài khoản" : "Đã mở khóa tài khoản"
+        };
     }
 };
 

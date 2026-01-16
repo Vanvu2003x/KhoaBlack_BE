@@ -288,13 +288,31 @@ const OrderService = {
               (SELECT COALESCE(SUM(amount - profit), 0) FROM orders WHERE status = 'success' AND DATE_FORMAT(updated_at, '%Y-%m') = DATE_FORMAT(NOW(), '%Y-%m')) AS total_cost_this_month,
               (SELECT COALESCE(SUM(amount - profit), 0) FROM orders WHERE status = 'success' AND DATE(updated_at) = CURRENT_DATE) AS total_cost_today
          `);
+
+        // Get last 30 days breakdown
+        const last30Days = await db.execute(sql`
+            SELECT 
+                DATE(updated_at) as date,
+                COALESCE(SUM(amount - profit), 0) as total_cost
+            FROM orders
+            WHERE status = 'success'
+                AND updated_at >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+            GROUP BY DATE(updated_at)
+            ORDER BY date ASC
+        `);
+
         return {
             status: true,
-            total_cost: result[0].total_cost,
-            total_cost_this_month: result[0].total_cost_this_month,
-            total_cost_today: result[0].total_cost_today
+            total_cost: Number(result[0].total_cost),
+            total_cost_this_month: Number(result[0].total_cost_this_month),
+            total_cost_today: Number(result[0].total_cost_today),
+            last_30_days: last30Days[0].map(row => ({
+                date: row.date,
+                total_cost: Number(row.total_cost)
+            }))
         };
     },
+
 
     getMyNapOrdersStats: async (userIdNap) => {
         const result = await db.select({
@@ -304,5 +322,8 @@ const OrderService = {
         return result;
     }
 };
+
+// Alias getCostStats to getCostSummary for backward compatibility
+OrderService.getCostStats = OrderService.getCostSummary;
 
 module.exports = OrderService;

@@ -3,6 +3,7 @@ const router = express.Router();
 const WalletLogController = require('./walletLog.controller');
 const { checkToken } = require('../../middleware/auJWT.middleware');
 
+router.get('/getTongtien', WalletLogController.getTongtien); // FE calls this endpoint
 router.get('/total-amount', WalletLogController.getTongTienTrongKhoang);
 router.get('/', WalletLogController.getWalletLog); // Moved from /logs to / to match FE
 router.get('/pending', WalletLogController.getPendingLogs); // New route
@@ -15,3 +16,4 @@ router.post('/cancel', checkToken, WalletLogController.cancelWalletLog);
 router.get('/user-logs', checkToken, WalletLogController.getLogsByUser);
 
 module.exports = router;
+
