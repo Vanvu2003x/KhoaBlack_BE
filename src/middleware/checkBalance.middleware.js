@@ -1,6 +1,6 @@
-const { getPriceById } = require("../models/acc.model");
-const { getPackagePriceById } = require("../models/toupPackage.model");
-const { getBalance, recharge_balance } = require("../models/user.model");
+const AccService = require("../modules/acc/acc.service");
+const PackageService = require("../modules/package/package.service");
+const UserService = require("../modules/user/user.service");
 const { verifyToken } = require("../services/jwt.service");
 
 async function CheckBalance(req, res, next) {
@@ -21,10 +21,20 @@ async function CheckBalance(req, res, next) {
     const userId = tokenResult.decoded.id;
     let price = null;
 
+    let description = "Thanh toán dịch vụ";
+
     if (req.body.package_id) {
-      price = (await getPackagePriceById(req.body.package_id)).price;
+      const packageObj = await PackageService.getPackagePriceById(req.body.package_id);
+      if (packageObj) {
+        price = packageObj.price;
+        description = `Mua gói: ${packageObj.package_name}`;
+      }
     } else if (req.body.acc_id) {
-      price = await getPriceById(req.body.acc_id);
+      const accObj = await AccService.getPriceById(req.body.acc_id);
+      if (accObj) {
+        price = accObj.price;
+        description = `Mua tài khoản: ${accObj.info || req.body.acc_id}`;
+      }
     } else {
       return res.status(400).json({ message: "Thiếu package_id hoặc acc_id" });
     }
@@ -32,19 +42,20 @@ async function CheckBalance(req, res, next) {
       return res.status(404).json({ message: "Không tìm thấy giá của gói hoặc account" });
     }
 
-    console.log(price);
-    
-    const balance = await getBalance(userId);
-    if (balance == null) {
-      return res.status(404).json({ message: "Không tìm thấy số dư" });
+    // console.log(price);
+
+    const user = await UserService.getUserById(userId);
+    if (!user) {
+      return res.status(404).json({ message: "Không tìm thấy user" });
     }
+    const balance = user.balance; // assuming balance is field
 
     if (Number(balance) < Number(price)) {
       return res.status(400).json({ message: "Số dư không đủ" });
     }
 
-    // Trừ tiền trước khi cho đi tiếp
-    await recharge_balance(userId, price, "debit");
+    // Trừ tiền trước khi cho đi tiếp, using "debit" type
+    await UserService.updateBalance(userId, price, "debit", description);
 
     // gán user_id vào body cho tiện dùng ở controller
     req.body.user_id = userId;

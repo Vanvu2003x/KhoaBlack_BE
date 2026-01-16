@@ -1,37 +1,35 @@
 {
-  "name": "backend",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "dependencies": {
-    "@payos/node": "^1.0.10",
-    "axios": "^1.10.0",
-    "bcrypt": "^6.0.0",
-    "cors": "^2.8.5",
-    "dotenv": "^17.0.1",
-    "express": "^5.1.0",
-    "jsonwebtoken": "^9.0.2",
-    "mongodb": "^6.17.0",
-    "multer": "^2.0.1",
-    "nanoid": "^5.1.5",
-    "nodemailer": "^7.0.4",
-    "pg": "^8.16.3",
-    "qrcode": "^1.5.4",
-    "redis": "^5.5.6",
-    "resend": "^4.6.0",
-    "socket.io": "^4.8.1",
-    "ws": "^8.18.3"
-  },
-  "devDependencies": {
-    "nodemon": "^3.1.10"
-  }
+    "name": "khoablack-be",
+    "version": "1.0.0",
+    "description": "Backend for KhoaBlack",
+    "main": "src/server.js",
+    "scripts": {
+        "start": "node src/server.js",
+        "dev": "nodemon src/server.js",
+        "db:generate": "drizzle-kit generate",
+        "db:migrate": "drizzle-kit migrate",
+        "db:push": "drizzle-kit push",
+        "db:studio": "drizzle-kit studio"
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "bcrypt": "^6.0.0",
+        "cookie-parser": "^1.4.7",
+        "cors": "^2.8.5",
+        "dotenv": "^16.4.5",
+        "drizzle-orm": "^0.30.9",
+        "express": "^4.19.2",
+        "jsonwebtoken": "^9.0.3",
+        "multer": "^1.4.5-lts.1",
+        "mysql2": "^3.9.7",
+        "nodemailer": "^6.9.13",
+        "redis": "^4.6.13",
+        "socket.io": "^4.7.5"
+    },
+    "devDependencies": {
+        "drizzle-kit": "^0.20.17",
+        "nodemon": "^3.1.0"
+    }
 }

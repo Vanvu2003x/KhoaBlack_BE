@@ -1,26 +1,28 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const cookieParser = require('cookie-parser');
 
-const paymentRoutes = require('./routes/api/payment.route.js');
-const authroute = require('./routes/api/auth.route.js');
-const gamesRoute = require('./routes/api/games.route.js');
-const topup_wallet_logsRoute = require("./routes/api/ToUpWalletLog.route.js");
-const toup_packageRoute = require("./routes/api/toupPackage.route.js");
-const orderRoute = require("./routes/api/order.route.js");
+const paymentRoutes = require('./modules/payment/payment.route.js');
+const authroute = require('./modules/auth/auth.route.js');
+const gamesRoute = require('./modules/game/game.route.js');
+const topup_wallet_logsRoute = require("./modules/walletLog/walletLog.route.js");
+const toup_packageRoute = require("./modules/package/package.route.js");
+const orderRoute = require("./modules/order/order.route.js");
 const webhook = require('./routes/webhooks.route.js');
-const userRoute = require("./routes/api/user.route.js")
-const accRoute = require("./routes/api/acc.route.js")
-const accOrdersRoute = require('./routes/api/accOrder.route.js')
+const userRoute = require("./modules/user/user.route.js")
+const accRoute = require("./modules/acc/acc.route.js")
+const accOrdersRoute = require('./modules/acc/accOrder.route.js')
 const app = express();
 
 const corsOptions = {
-  origin: "*", 
+  origin: ["http://localhost:3000"], // Update with production domain when deploying
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-  credentials: false
+  credentials: true
 };
 
 app.use(cors(corsOptions));
+app.use(cookieParser());
 
 app.use(express.json());
 
@@ -28,15 +30,30 @@ app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // ✅ Các route
+// ✅ Các route
 app.use('/api/order', orderRoute);
 app.use('/api/toup-wallet-log', topup_wallet_logsRoute);
 app.use('/api/games', gamesRoute);
 app.use('/api/payment', paymentRoutes);
+app.use('/api/statistics', require('./modules/statistics/statistics.route.js'));
+
+// Auth & User routes - Merged logic or separate?
+// FE calls /api/users for both auth and user info.
 app.use('/api/users', authroute);
+app.use('/api/users', userRoute);
+
+// FE calls /api/user/balance...
+// We can mount a specific router for /api/user or reuse userRoute if it has the paths
+app.use('/api/user', userRoute); // For /balance endpoints if defined there
+app.use('/api/user', authroute); // For /balance/send-otp if defined there?
+
 app.use('/webhook', webhook);
 app.use('/api/toup-package', toup_packageRoute);
-app.use('/api/user', userRoute)
-app.use('/api/acc',accRoute)
-app.use('/api/accOrder',accOrdersRoute)
+app.use('/api/acc', accRoute);
+app.use('/api/accOrder', accOrdersRoute);
+
+// Error Handling Middleware
+const errorMiddleware = require('./middleware/error.middleware');
+app.use(errorMiddleware);
 
 module.exports = app;
