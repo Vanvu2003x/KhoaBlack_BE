@@ -16,7 +16,13 @@ const accOrdersRoute = require('./modules/acc/accOrder.route.js')
 const app = express();
 
 const corsOptions = {
-  origin: ["http://localhost:3000"], // Update with production domain when deploying
+  origin: [
+    "http://localhost:3000",
+    "https://khoablacktopup.vn",
+    "https://www.khoablacktopup.vn",
+    "http://khoablacktopup.vn",
+    "http://www.khoablacktopup.vn"
+  ],
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   credentials: true
 };
