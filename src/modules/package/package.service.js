@@ -20,6 +20,9 @@ const PackageService = {
             package_name: topupPackages.package_name,
             game_id: topupPackages.game_id,
             price: topupPackages.price,
+            price_basic: topupPackages.price_basic,
+            price_pro: topupPackages.price_pro,
+            price_plus: topupPackages.price_plus,
             thumbnail: topupPackages.thumbnail,
             package_type: topupPackages.package_type,
             status: topupPackages.status,
@@ -69,6 +72,9 @@ const PackageService = {
             game_id: data.game_id,
             price: data.price,
             origin_price: data.origin_price,
+            price_basic: data.price_basic || null,
+            price_pro: data.price_pro || null,
+            price_plus: data.price_plus || null,
             thumbnail: thumbnailPath,
             package_type: data.package_type,
             id_server: data.id_server, // boolean
@@ -94,6 +100,9 @@ const PackageService = {
         if (data.package_name !== undefined) updateData.package_name = data.package_name;
         if (data.price !== undefined) updateData.price = parseInt(data.price);
         if (data.origin_price !== undefined) updateData.origin_price = parseInt(data.origin_price);
+        if (data.price_basic !== undefined) updateData.price_basic = data.price_basic ? parseInt(data.price_basic) : null;
+        if (data.price_pro !== undefined) updateData.price_pro = data.price_pro ? parseInt(data.price_pro) : null;
+        if (data.price_plus !== undefined) updateData.price_plus = data.price_plus ? parseInt(data.price_plus) : null;
         if (data.package_type !== undefined) updateData.package_type = data.package_type;
         if (data.thumbnail !== undefined) updateData.thumbnail = data.thumbnail;
         if (data.id_server !== undefined) updateData.id_server = data.id_server;

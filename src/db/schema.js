@@ -18,6 +18,7 @@ const users = mysqlTable('users', {
     email: varchar('email', { length: 100 }).unique().notNull(),
     hash_password: varchar('hash_password', { length: 60 }).notNull(),
     role: varchar('role', { length: 40 }).default('user'),
+    level: int('level').default(1), // 1=Basic, 2=Pro, 3=Plus
     balance: int('balance').default(0),
     status: varchar('status', { length: 20 }).default('active'), // Enum-like: active, banned
     created_at: timestamp('created_at').default(sql`CURRENT_TIMESTAMP`),
@@ -39,7 +40,10 @@ const topupPackages = mysqlTable('topup_packages', {
     id: varchar('id', { length: 36 }).primaryKey(), // UUID
     package_name: varchar('package_name', { length: 255 }).notNull(),
     game_id: varchar('game_id', { length: 36 }).notNull(), // FK to games
-    price: int('price').notNull(),
+    price: int('price').notNull(), // Default price (used as fallback)
+    price_basic: int('price_basic'), // Price for level 1 (Basic)
+    price_pro: int('price_pro'),     // Price for level 2 (Pro)
+    price_plus: int('price_plus'),   // Price for level 3 (Plus)
     thumbnail: varchar('thumbnail', { length: 500 }),
     package_type: varchar('package_type', { length: 50 }),
     status: varchar('status', { length: 20 }).default('active'),
@@ -79,7 +83,10 @@ const acc = mysqlTable('acc', {
     game_id: varchar('game_id', { length: 36 }).notNull(), // FK to games
     info: text('info'),
     image: varchar('image', { length: 255 }),
-    price: int('price').notNull(),
+    price: int('price').notNull(), // Default price (fallback)
+    price_basic: int('price_basic'), // Price for level 1 (Basic)
+    price_pro: int('price_pro'),     // Price for level 2 (Pro)
+    price_plus: int('price_plus'),   // Price for level 3 (Plus)
     status: varchar('status', { length: 50 }).default('available'),
 });
 

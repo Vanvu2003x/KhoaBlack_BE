@@ -40,49 +40,99 @@ const buildOrderQuery = () => {
 
 const OrderService = {
     createOrder: async (data) => {
-        // data should include: { user_id, package_id, account_info, amount, profit }
+        return await db.transaction(async (tx) => {
+            // 1. Fetch User (Balance & Level)
+            const [user] = await tx.select({
+                id: users.id,
+                balance: users.balance,
+                level: users.level
+            }).from(users).where(eq(users.id, data.user_id));
 
-        // Check user balance first
-        const [user] = await db.select({ balance: users.balance }).from(users).where(eq(users.id, data.user_id));
-        if (!user) {
-            throw { status: 404, message: 'Người dùng không tồn tại' };
-        }
+            if (!user) {
+                throw { status: 404, message: 'Người dùng không tồn tại' };
+            }
 
-        if (user.balance < data.amount) {
-            throw { status: 400, message: 'Số dư không đủ để thanh toán' };
-        }
+            // 2. Fetch Package Details (Prices)
+            const [packageInfo] = await tx
+                .select({
+                    id: topupPackages.id,
+                    package_name: topupPackages.package_name,
+                    price: topupPackages.price,
+                    origin_price: topupPackages.origin_price,
+                    price_basic: topupPackages.price_basic,
+                    price_pro: topupPackages.price_pro,
+                    price_plus: topupPackages.price_plus,
+                    game_name: games.name,
+                    game_code: games.gamecode
+                })
+                .from(topupPackages)
+                .innerJoin(games, eq(topupPackages.game_id, games.id))
+                .where(eq(topupPackages.id, data.package_id));
 
-        // Fetch package and game info for detailed description
-        const [packageInfo] = await db
-            .select({
-                package_name: topupPackages.package_name,
-                game_name: games.name
-            })
-            .from(topupPackages)
-            .innerJoin(games, eq(topupPackages.game_id, games.id))
-            .where(eq(topupPackages.id, data.package_id));
+            if (!packageInfo) {
+                throw { status: 404, message: 'Gói nạp không tồn tại' };
+            }
 
-        const newOrder = {
-            user_id: data.user_id,
-            package_id: data.package_id,
-            account_info: data.account_info,
-            amount: data.amount,
-            profit: data.profit || 0,
-            status: 'pending'
-        };
+            // 3. Calculate Valid Price
+            let finalPrice = packageInfo.price; // Default
+            const level = user.level || 1;
 
-        await db.insert(orders).values(newOrder);
+            if (level === 2 && packageInfo.price_pro) finalPrice = packageInfo.price_pro;
+            if (level === 3 && packageInfo.price_plus) finalPrice = packageInfo.price_plus;
 
-        // Deduct balance from user with detailed description
-        const description = packageInfo
-            ? `Thanh toán gói ${packageInfo.package_name} - ${packageInfo.game_name}`
-            : `Thanh toán đơn hàng`;
+            // Allow Basic override if set (unlikely but safe)
+            if (level === 1 && packageInfo.price_basic) finalPrice = packageInfo.price_basic;
 
-        await UserService.updateBalance(data.user_id, data.amount, 'debit', description);
 
-        // Fetch the created order to return
-        const [created] = await db.select().from(orders).orderBy(desc(orders.id)).limit(1);
-        return created;
+            // 4. Validate Balance
+            if (Number(user.balance) < finalPrice) {
+                const missing = finalPrice - Number(user.balance);
+                throw {
+                    status: 400,
+                    message: `Số dư không đủ! Hiện có: ${Number(user.balance).toLocaleString('vi-VN')}đ. Cần: ${finalPrice.toLocaleString('vi-VN')}đ. Thiếu: ${missing.toLocaleString('vi-VN')}đ. Vui lòng nạp thêm!`
+                };
+            }
+
+            // 5. Calculate Profit
+            // Profit = Selling Price - Origin Price
+            const originPrice = packageInfo.origin_price || 0;
+            const finalProfit = finalPrice - originPrice;
+
+            const description = `Thanh toán gói ${packageInfo.package_name} - ${packageInfo.game_name}`;
+
+            // 6. Deduct Balance
+            const balanceBefore = Number(user.balance);
+            const balanceAfter = balanceBefore - finalPrice;
+
+            await tx.update(users)
+                .set({ balance: balanceAfter })
+                .where(eq(users.id, data.user_id));
+
+            await tx.insert(balanceHistory).values({
+                user_id: data.user_id,
+                amount: -finalPrice, // Negative for debit
+                balance_before: balanceBefore,
+                balance_after: balanceAfter,
+                type: "debit",
+                description: description
+            });
+
+            // 7. Create Order
+            const newOrder = {
+                user_id: data.user_id,
+                package_id: data.package_id,
+                account_info: data.account_info,
+                amount: finalPrice, // Secure Price
+                profit: finalProfit, // Secure Profit
+                status: 'pending'
+            };
+
+            const [result] = await tx.insert(orders).values(newOrder);
+
+            // Fetch created order (Assuming result might not provide full row in all drivers, reusing safe fetch)
+            const [created] = await tx.select().from(orders).orderBy(desc(orders.id)).limit(1);
+            return created;
+        });
     },
 
     getAllOrders: async (page = 1) => {
