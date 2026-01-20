@@ -72,6 +72,17 @@ const AuthController = {
     getRole: asyncHandler(async (req, res) => {
         const result = await AuthService.getRole(req.user.id);
         return res.json(result);
+    }),
+
+    sendRoleOTP: asyncHandler(async (req, res) => {
+        const { targetUserId, newRole } = req.body;
+        const result = await AuthService.sendRoleOTP(req.user.id, targetUserId, newRole);
+        return res.json(result);
+    }),
+
+    verifyRoleOTP: asyncHandler(async (req, res) => {
+        const result = await AuthService.verifyRoleOTP(req.user.id, req.body.otp);
+        return res.json(result);
     })
 };
 

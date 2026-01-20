@@ -58,12 +58,18 @@ function initSocket(io) {
   });
 }
 
-function getIO() {
-  return _io;
+function emitToUser(userId, event, data) {
+  if (!_io) return;
+  for (const [socketId, userData] of userSocketMap.entries()) {
+    if (userData.id === userId) {
+      _io.to(socketId).emit(event, data);
+    }
+  }
 }
 
 module.exports = {
   initSocket,
   getIO,
+  emitToUser,
   userSocketMap,
 };

@@ -25,5 +25,13 @@ router.post('/balance/send-otp', checkToken, AuthController.sendAdminOTP);
 router.post('/balance/verify-otp', checkToken, AuthController.verifyAdminOTP);
 router.put('/balance', checkToken, UserController.updateBalance); // Frontend calls PUT /api/user/balance
 
+// Role promotion OTP routes
+router.post('/role/send-otp', checkToken, AuthController.sendRoleOTP);
+router.post('/role/verify-otp', checkToken, AuthController.verifyRoleOTP);
+
+// User level routes (admin only, no OTP needed)
+router.put('/:id/level', checkToken, UserController.updateUserLevel);
+
 module.exports = router;
+
 

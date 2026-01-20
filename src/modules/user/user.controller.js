@@ -37,6 +37,11 @@ const UserController = {
     toggleUserLock: asyncHandler(async (req, res) => {
         const result = await UserService.toggleUserLock(req.params.id);
         return res.json(result);
+    }),
+
+    updateUserLevel: asyncHandler(async (req, res) => {
+        const result = await UserService.updateUserLevel(req.params.id, req.body.level);
+        return res.json(result);
     })
 };
 

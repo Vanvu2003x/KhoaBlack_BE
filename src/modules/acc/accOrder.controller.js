@@ -29,23 +29,23 @@ const AccOrderController = {
 
     getAllOrders: asyncHandler(async (req, res) => {
         const result = await AccOrderService.getAll();
-        res.json(result);
+        res.json({ success: true, data: result });
     }),
 
     cancelOrder: asyncHandler(async (req, res) => {
         const result = await AccOrderService.cancelOrder(req.params.id);
-        res.json(result);
+        res.json({ success: true, data: result });
     }),
 
     sendAcc: asyncHandler(async (req, res) => {
         // Correct mapping: sendAcc calls updateContactInfo
         const result = await AccOrderService.updateContactInfo(req.params.id, req.body.ttacc);
-        res.json(result);
+        res.json({ success: true, data: result });
     }),
 
     getMyOrders: asyncHandler(async (req, res) => {
         const result = await AccOrderService.getByUserId(req.user.id);
-        res.json(result);
+        res.json({ success: true, data: result });
     })
 };
 

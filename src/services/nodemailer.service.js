@@ -1,320 +1,1007 @@
 const { transporter } = require("../configs/nodomailer.config");
+const path = require('path');
 
 /**
- * Premium Gaming Email Template
- * Style: Modern, bold gradients, high contrast, clean typography.
+ * ═══════════════════════════════════════════════════════════════════════════════
+ *                    🎮 NAPGAMEUYTIN - PREMIUM EMAIL TEMPLATES 🎮
+ * ═══════════════════════════════════════════════════════════════════════════════
+ * 
+ * Style: Dark Gaming Premium
+ * Theme: Deep dark backgrounds, neon violet/purple accents, glassmorphism panels
+ * Vibe: Professional, trustworthy, modern gaming platform
  */
-const STYLES = {
-  // Brand Gradient: Indigo -> Purple
-  brandGradient: "linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)",
-  brandColor: "#6366F1",
 
-  // Security Gradient: Red -> Orange (For Forgot Password)
-  securityGradient: "linear-gradient(135deg, #DC2626 0%, #EA580C 100%)",
-  securityColor: "#DC2626",
+// ═══════════════════════════════════════════════════════════════════════════════
+//                              🎨 DESIGN TOKENS
+// ═══════════════════════════════════════════════════════════════════════════════
+const THEME = {
+    // Core Dark Palette
+    bgDeep: "#0A0A0F",           // Deepest background
+    bgDark: "#12121A",           // Main email background
+    bgCard: "#1A1A24",           // Card/Container background
+    bgCardHover: "#222230",      // Slightly lighter for contrast
+    bgInput: "#0D0D14",          // Input field backgrounds
 
-  accentColor: "#F472B6", // Pinkish accent
-  successColor: "#10B981",
-  errorColor: "#EF4444",
-  warningColor: "#F59E0B",
-  bgBody: "#F0F2F5",
-  bgCard: "#FFFFFF",
-  textMain: "#1F2937",
-  textMuted: "#6B7280",
+    // Borders & Lines
+    borderSubtle: "#2A2A3C",     // Subtle dividers
+    borderAccent: "#3D3D5C",     // More visible borders
+    borderGlow: "#8B5CF6",       // Glowing accent border
+
+    // Brand Colors
+    primary: "#8B5CF6",          // Main violet/purple
+    primaryLight: "#A78BFA",     // Lighter violet
+    primaryDark: "#7C3AED",      // Darker violet
+    primaryGlow: "rgba(139, 92, 246, 0.3)", // Glow effect
+
+    // Accent Colors
+    accent: "#06B6D4",           // Cyan accent
+    accentGlow: "rgba(6, 182, 212, 0.3)",
+
+    // Functional Colors
+    success: "#10B981",
+    successBg: "rgba(16, 185, 129, 0.15)",
+    error: "#EF4444",
+    errorBg: "rgba(239, 68, 68, 0.15)",
+    warning: "#F59E0B",
+    warningBg: "rgba(245, 158, 11, 0.15)",
+    info: "#3B82F6",
+    infoBg: "rgba(59, 130, 246, 0.15)",
+
+    // Typography
+    textPrimary: "#FFFFFF",
+    textSecondary: "#A1A1AA",
+    textMuted: "#71717A",
+    textInverse: "#0A0A0F",
+
+    // Gradients
+    gradientPrimary: "linear-gradient(135deg, #8B5CF6 0%, #06B6D4 100%)",
+    gradientDanger: "linear-gradient(135deg, #EF4444 0%, #F97316 100%)",
+    gradientSuccess: "linear-gradient(135deg, #10B981 0%, #34D399 100%)",
+    gradientDark: "linear-gradient(180deg, #1A1A24 0%, #12121A 100%)",
 };
 
-// SVG Icons as strings for better email support (no external reliance)
-const ICONS = {
-  logo: "https://lh3.googleusercontent.com/fife/ALs6j_Frpd17RkwIeKsdo46gz0v1RHw9qEi57tN-CzYa70_o0qQGuOfCT6pa6vlnlPrkf-Wkeer5hizxYwzVtqKM8KgknW0Wx6w-plAH--shKkoRQV6rbldRuczow_vP0HhkkfYWA84L7WYV-Nq-rxmaIMrNZ1Bj3LZbnYuWMuAzjhcE8ULhzukD_KRMH5pkW3Z9gk8h5PmAtvDgI4Rnu5fydMKup1cQCEIkyYcPKUDH5Wp_ji8R581OPdiwKqbFtE84TYA4h0f9kj6u7FfacFYmEU6dF3mYSHRkbtdmi9l_866g9r_k28dg8PZ3lWzY1gGgrzb1q49-iZpUITbuYScre6D82mLbhuElp280kNS5fVhl829vD5TatRbYXNKJBVo2cqzAX-s3HPS8qo5mZtIxfewd6pxNk5hEc2p67oejXqN3zuaYW69VxpMBRTqpcSEejIVDg_JGQVjepEA3tN84E6ClLyiyjTR2UQ3D2XwE2cyf938NJEpb-lQOUd5Ohy0ilCXhDId3LfqEjHs5f-eeXIScvEeOoa_eNgXYmpl2OgYbaFqZOlzWDjXwLuE8gydAEtb2UwAGpjoX4UQ8Hp2y6-54LlH8swuNLlN-Rq4mA-f1UdZ1DHLMHO6-YLpJ7REExSkM0BCud5G8LCYjrLn_B0uFHqvgwVd61cEjUE0_gEI2ZYlH8M9WfGhltTuSth-23da_QTkeimegLywkVpsJXaOI19s7sAe9u6CIJGTatxw-PJpr85fJuSpvCfyGqc5qYV7WV9bimwNyMtxATR85Sw3h_F1zNrhV5uHk2buo6QHqVhEC1igBcbodrhOovFEAtmJXFaIO-i6XcNnaZcNSFUFW_s4G789r8uCrJbUFFz7ii4cnHe_R54Y-NYFNX-fRoLWOsVF6MjSSTonkukKeadbahz_R28CX4tM6q6zN2uh8oBVneLmAeWcWEqzRYPONtomnTWhfyJqQ691i77IHSgXwd2lwYPnDNIRbPa_fYjBcmwhQexncIYWpIT92EBs=w1358-h650",
-  check: "✅",
-  cross: "❌",
-  clock: "⏳",
-  sync: "🔄",
-  shield: "🛡️"
+// Logo attachment
+const logoAttachment = {
+    filename: 'logo.ico',
+    path: path.join(process.cwd(), 'src/uploads/logo.ico'),
+    cid: 'logo'
 };
 
-function baseTemplate(title, preheader, content, theme = 'default') {
-  const isSecurity = theme === 'security';
-  const headerBg = isSecurity ? STYLES.securityGradient : STYLES.brandGradient;
-  const headerTitleColor = "#FFFFFF";
+// ═══════════════════════════════════════════════════════════════════════════════
+//                              📧 BASE TEMPLATE
+// ═══════════════════════════════════════════════════════════════════════════════
+function baseTemplate(options = {}) {
+    const {
+        title = "Napgameuytin",
+        subtitle = "",
+        content = "",
+        headerGradient = THEME.gradientPrimary,
+        headerIcon = "🎮",
+    } = options;
 
-  return `
+    return `
 <!DOCTYPE html>
-<html>
+<html lang="vi">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>${title}</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap');
-    </style>
+    <!--[if mso]>
+    <noscript>
+        <xml>
+            <o:OfficeDocumentSettings>
+                <o:PixelsPerInch>96</o:PixelsPerInch>
+            </o:OfficeDocumentSettings>
+        </xml>
+    </noscript>
+    <![endif]-->
 </head>
-<body style="margin: 0; padding: 0; background-color: ${STYLES.bgBody}; font-family: 'Outfit', 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: ${STYLES.textMain};">
+<body style="margin: 0; padding: 0; background-color: ${THEME.bgDeep}; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased;">
     
-    <!-- Outer Wrapper -->
-    <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+    <!-- Preheader Text (Hidden) -->
+    <div style="display: none; max-height: 0; overflow: hidden; mso-hide: all;">
+        ${subtitle || title} - Napgameuytin.vn
+    </div>
+
+    <!-- Email Wrapper -->
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: ${THEME.bgDeep};">
         <tr>
-            <td align="center" style="padding: 20px 10px;">
+            <td align="center" style="padding: 40px 15px;">
                 
-                <!-- Main Card -->
-                <table role="presentation" width="100%" style="max-width: 600px; background-color: ${STYLES.bgCard}; border-radius: 20px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); overflow: hidden;">
+                <!-- Main Container -->
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; background-color: ${THEME.bgDark}; border-radius: 24px; overflow: hidden; border: 1px solid ${THEME.borderSubtle}; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
                     
-                    <!-- Gradient Header with Logo -->
+                    <!-- ═══════════ HEADER ═══════════ -->
                     <tr>
-                        <td style="background: ${headerBg}; padding: 40px 20px; text-align: center;">
-                            <img src="${ICONS.logo}" alt="Napgameuytin" style="height: 50px; border-radius: 8px; background: rgba(255,255,255,0.1); padding: 10px; backdrop-filter: blur(5px); box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                            <h1 style="margin: 20px 0 0 0; color: ${headerTitleColor}; font-size: 24px; font-weight: 700; text-shadow: 0 2px 4px rgba(0,0,0,0.2);">${title}</h1>
-                            <p style="margin: 8px 0 0 0; color: rgba(255,255,255,0.9); font-size: 16px;">${preheader}</p>
+                        <td style="background: ${headerGradient}; padding: 50px 40px; text-align: center;">
+                            <!-- Logo -->
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td align="center">
+                                        <div style="width: 70px; height: 70px; background: rgba(255,255,255,0.15); border-radius: 20px; display: inline-block; line-height: 70px; font-size: 32px; backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.2);">
+                                            ${headerIcon}
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center" style="padding-top: 20px;">
+                                        <h1 style="margin: 0; color: #FFFFFF; font-size: 28px; font-weight: 700; letter-spacing: -0.5px; text-shadow: 0 2px 10px rgba(0,0,0,0.3);">
+                                            ${title}
+                                        </h1>
+                                    </td>
+                                </tr>
+                                ${subtitle ? `
+                                <tr>
+                                    <td align="center" style="padding-top: 10px;">
+                                        <p style="margin: 0; color: rgba(255,255,255,0.85); font-size: 16px; font-weight: 400;">
+                                            ${subtitle}
+                                        </p>
+                                    </td>
+                                </tr>
+                                ` : ''}
+                            </table>
                         </td>
                     </tr>
 
-                    <!-- Content Body -->
+                    <!-- ═══════════ CONTENT ═══════════ -->
                     <tr>
-                        <td style="padding: 40px 30px;">
+                        <td style="padding: 40px 35px;">
                             ${content}
+                        </td>
+                    </tr>
+
+                    <!-- ═══════════ FOOTER ═══════════ -->
+                    <tr>
+                        <td style="background-color: ${THEME.bgCard}; padding: 35px; border-top: 1px solid ${THEME.borderSubtle};">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <!-- Brand -->
+                                <tr>
+                                    <td align="center" style="padding-bottom: 20px;">
+                                        <img src="cid:logo" alt="Napgameuytin" style="height: 40px; border-radius: 8px;">
+                                    </td>
+                                </tr>
+                                <!-- Tagline -->
+                                <tr>
+                                    <td align="center" style="padding-bottom: 20px;">
+                                        <p style="margin: 0; color: ${THEME.textSecondary}; font-size: 14px; font-weight: 500;">
+                                            🎮 Nạp game uy tín hàng đầu Việt Nam
+                                        </p>
+                                    </td>
+                                </tr>
+                                <!-- Links -->
+                                <tr>
+                                    <td align="center" style="padding-bottom: 25px;">
+                                        <a href="https://napgameuytin.vn" style="color: ${THEME.primary}; text-decoration: none; font-size: 14px; margin: 0 12px;">Trang chủ</a>
+                                        <span style="color: ${THEME.borderAccent};">•</span>
+                                        <a href="https://napgameuytin.vn/user/history" style="color: ${THEME.primary}; text-decoration: none; font-size: 14px; margin: 0 12px;">Lịch sử</a>
+                                        <span style="color: ${THEME.borderAccent};">•</span>
+                                        <a href="https://napgameuytin.vn/support" style="color: ${THEME.primary}; text-decoration: none; font-size: 14px; margin: 0 12px;">Hỗ trợ</a>
+                                    </td>
+                                </tr>
+                                <!-- Copyright -->
+                                <tr>
+                                    <td align="center">
+                                        <p style="margin: 0; color: ${THEME.textMuted}; font-size: 12px; line-height: 1.6;">
+                                            © 2026 Napgameuytin. All rights reserved.<br>
+                                            Email tự động - Vui lòng không phản hồi trực tiếp.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                </table>
+                
+                <!-- Bottom Tagline -->
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px;">
+                    <tr>
+                        <td align="center" style="padding: 25px 20px;">
+                            <p style="margin: 0; color: ${THEME.textMuted}; font-size: 11px; letter-spacing: 2px; text-transform: uppercase;">
+                                Uy tín • Nhanh chóng • Bảo mật
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+
+            </td>
+        </tr>
+    </table>
+
+</body>
+</html>
+    `.trim();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//                              🔐 SEND OTP - ĐĂNG KÝ
+// ═══════════════════════════════════════════════════════════════════════════════
+async function sendOTP(email, otp) {
+    try {
+        const username = email.split('@')[0];
+        const otpDigits = otp.toString().split('');
+
+        const content = `
+            <!-- Welcome Message -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                    <td style="padding-bottom: 25px;">
+                        <p style="margin: 0 0 10px 0; color: ${THEME.textPrimary}; font-size: 18px;">
+                            Xin chào <strong style="color: ${THEME.primary};">${username}</strong> 👋
+                        </p>
+                        <p style="margin: 0; color: ${THEME.textSecondary}; font-size: 15px; line-height: 1.7;">
+                            Chào mừng bạn đến với <strong style="color: ${THEME.textPrimary};">Napgameuytin</strong>! Để hoàn tất đăng ký, hãy nhập mã xác minh bên dưới.
+                        </p>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- OTP Box -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: ${THEME.bgCard}; border-radius: 16px; border: 1px solid ${THEME.borderGlow}; overflow: hidden;">
+                <tr>
+                    <td style="padding: 35px 25px; text-align: center;">
+                        <p style="margin: 0 0 20px 0; color: ${THEME.textMuted}; font-size: 12px; text-transform: uppercase; letter-spacing: 3px; font-weight: 600;">
+                            Mã xác minh của bạn
+                        </p>
+                        <!-- OTP Digits -->
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                            <tr>
+                                ${otpDigits.map(digit => `
+                                    <td style="padding: 0 6px;">
+                                        <div style="width: 52px; height: 64px; background: ${THEME.bgInput}; border: 2px solid ${THEME.borderAccent}; border-radius: 12px; font-size: 28px; font-weight: 700; color: ${THEME.primary}; line-height: 60px; text-align: center; font-family: 'Courier New', monospace;">
+                                            ${digit}
+                                        </div>
+                                    </td>
+                                `).join('')}
+                            </tr>
+                        </table>
+                        <p style="margin: 20px 0 0 0; color: ${THEME.textMuted}; font-size: 13px;">
+                            ⏱️ Mã có hiệu lực trong <strong style="color: ${THEME.warning};">5 phút</strong>
+                        </p>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Warning -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 25px;">
+                <tr>
+                    <td style="background: ${THEME.warningBg}; border-left: 4px solid ${THEME.warning}; border-radius: 8px; padding: 15px 18px;">
+                        <p style="margin: 0; color: ${THEME.warning}; font-size: 13px; line-height: 1.6;">
+                            <strong>⚠️ Lưu ý bảo mật:</strong> Không chia sẻ mã này với bất kỳ ai, kể cả nhân viên hỗ trợ.
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        `;
+
+        const html = baseTemplate({
+            title: "Xác Minh Tài Khoản",
+            subtitle: "Chỉ còn một bước nữa thôi!",
+            content,
+            headerIcon: "🚀"
+        });
+
+        const info = await transporter.sendMail({
+            from: '"Napgameuytin" <napgameuytin2111@gmail.com>',
+            to: email,
+            subject: "🚀 Mã xác minh đăng ký tài khoản",
+            html,
+            attachments: [logoAttachment]
+        });
+
+        console.log("✅ OTP Register sent:", info.messageId);
+        return info;
+    } catch (error) {
+        console.error("❌ Send OTP Error:", error);
+        throw error;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//                          🔐 SEND OTP - KHÔI PHỤC MẬT KHẨU
+// ═══════════════════════════════════════════════════════════════════════════════
+async function sendOTPRePass(email, otp) {
+    try {
+        const otpDigits = otp.toString().split('');
+
+        const content = `
+            <!-- Security Alert Header -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 25px;">
+                <tr>
+                    <td align="center">
+                        <div style="width: 80px; height: 80px; background: ${THEME.errorBg}; border-radius: 50%; display: inline-block; line-height: 80px; font-size: 40px; margin-bottom: 15px;">
+                            🛡️
+                        </div>
+                        <p style="margin: 0; color: ${THEME.textSecondary}; font-size: 15px; line-height: 1.7;">
+                            Chúng tôi nhận được yêu cầu đặt lại mật khẩu cho tài khoản:
+                        </p>
+                        <p style="margin: 10px 0 0 0; color: ${THEME.error}; font-size: 18px; font-weight: 700;">
+                            ${email}
+                        </p>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- OTP Box - Security Theme -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: ${THEME.errorBg}; border-radius: 16px; border: 2px dashed ${THEME.error}; overflow: hidden;">
+                <tr>
+                    <td style="padding: 35px 25px; text-align: center;">
+                        <p style="margin: 0 0 20px 0; color: ${THEME.error}; font-size: 12px; text-transform: uppercase; letter-spacing: 3px; font-weight: 700;">
+                            🔐 Mã Bảo Mật
+                        </p>
+                        <!-- OTP Digits -->
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                            <tr>
+                                ${otpDigits.map(digit => `
+                                    <td style="padding: 0 6px;">
+                                        <div style="width: 52px; height: 64px; background: ${THEME.bgDark}; border: 2px solid ${THEME.error}; border-radius: 12px; font-size: 28px; font-weight: 700; color: ${THEME.error}; line-height: 60px; text-align: center; font-family: 'Courier New', monospace;">
+                                            ${digit}
+                                        </div>
+                                    </td>
+                                `).join('')}
+                            </tr>
+                        </table>
+                        <p style="margin: 20px 0 0 0; color: ${THEME.textMuted}; font-size: 13px;">
+                            Mã sẽ hết hạn trong <strong style="color: ${THEME.error};">5 phút</strong>
+                        </p>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Security Warning -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 25px;">
+                <tr>
+                    <td style="background: ${THEME.bgCard}; border-radius: 12px; padding: 20px; text-align: center;">
+                        <p style="margin: 0; color: ${THEME.textSecondary}; font-size: 14px; line-height: 1.7;">
+                            Nếu bạn <strong style="color: ${THEME.textPrimary};">không yêu cầu</strong> thao tác này, vui lòng bỏ qua email hoặc đổi mật khẩu ngay lập tức vì tài khoản có thể đang bị xâm nhập.
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        `;
+
+        const html = baseTemplate({
+            title: "Khôi Phục Mật Khẩu",
+            subtitle: "Yêu cầu đặt lại mật khẩu",
+            content,
+            headerGradient: THEME.gradientDanger,
+            headerIcon: "🔒"
+        });
+
+        const info = await transporter.sendMail({
+            from: '"Napgameuytin Security" <napgameuytin2111@gmail.com>',
+            to: email,
+            subject: "🔐 [CẢNH BÁO] Mã khôi phục mật khẩu",
+            html,
+            attachments: [logoAttachment]
+        });
+
+        console.log("✅ OTP Reset sent:", info.messageId);
+        return info;
+    } catch (error) {
+        console.error("❌ Send OTP Reset Error:", error);
+        throw error;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//                          💎 SEND ACC - GỬI TÀI KHOẢN ĐÃ MUA
+// ═══════════════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════════════
+//                          💎 SEND ACC - GỬI TÀI KHOẢN ĐÃ MUA (PREMIUM DESIGN)
+// ═══════════════════════════════════════════════════════════════════════════════
+async function sendAcc(email, data, order) {
+    try {
+        const formattedPrice = new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND'
+        }).format(order.price ?? 0);
+
+        const orderDate = new Date(order.create_at || order.created_at).toLocaleString('vi-VN', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        // Unique Premium Template for Account Delivery
+        const html = `
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Giao Hàng Thành Công - #${order.id}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #050505; font-family: 'Inter', system-ui, -apple-system, sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #050505; background-image: radial-gradient(circle at 50% 50%, #1a1a2e 0%, #050505 100%);">
+        <tr>
+            <td align="center" style="padding: 40px 15px;">
+                
+                <!-- Main Container with custom glow border -->
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; background-color: #0d0d12; border-radius: 30px; overflow: hidden; border: 1px solid #2a2a3c; box-shadow: 0 0 40px rgba(139, 92, 246, 0.15);">
+                    
+                    <!-- Premium Header -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 60px 40px; text-align: center; border-bottom: 2px solid #8b5cf6;">
+                            <div style="width: 80px; height: 80px; background: rgba(139, 92, 246, 0.1); border: 2px solid #8b5cf6; border-radius: 20px; display: inline-block; line-height: 80px; font-size: 36px; margin-bottom: 20px; box-shadow: 0 0 20px rgba(139, 92, 246, 0.3);">
+                                💎
+                            </div>
+                            <h1 style="margin: 0; color: #FFFFFF; font-size: 24px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px;">
+                                Giao Hàng Thành Công
+                            </h1>
+                            <p style="margin: 10px 0 0 0; color: #8b5cf6; font-size: 14px; font-weight: 600; letter-spacing: 1px;">
+                                ĐƠN HÀNG #${order.id} ĐÃ HOÀN TẤT
+                            </p>
+                        </td>
+                    </tr>
+
+                    <!-- Main Credential Area -->
+                    <tr>
+                        <td style="padding: 40px 35px;">
+                            <p style="margin: 0 0 30px 0; color: #a1a1aa; font-size: 15px; text-align: center; line-height: 1.6;">
+                                Chúc mừng! Giao dịch của bạn tại <strong style="color: #ffffff;">Napgameuytin</strong> đã được xử lý thành công. Dưới đây là thông tin tài khoản của bạn:
+                            </p>
+
+                            <!-- Glassmorphism Credential Box -->
+                            <div style="background: #16161e; border: 1px solid #2a2a3c; border-radius: 20px; padding: 30px; margin-bottom: 30px; position: relative; overflow: hidden;">
+                                <!-- Subtle grid pattern overlay would go here if email supported it, but we'll use CSS instead -->
+                                
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                    <!-- Tài khoản Header -->
+                                    <tr>
+                                        <td>
+                                            <div style="color: #6366f1; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px;">
+                                                 TÀI KHOẢN ĐĂNG NHẬP
+                                            </div>
+                                            <div style="background: #09090b; border: 1px solid #1e1e2d; border-radius: 12px; padding: 18px; margin-bottom: 25px;">
+                                                <code style="color: #ffffff; font-size: 18px; font-weight: 700; font-family: 'JetBrains Mono', 'Courier New', monospace; word-break: break-all;">
+                                                    ${data.account || data.acc_username || "..."}
+                                                </code>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <!-- Mật khẩu Header -->
+                                    <tr>
+                                        <td>
+                                            <div style="color: #06b6d4; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px;">
+                                                 MẬT KHẨU
+                                            </div>
+                                            <div style="background: #09090b; border: 1px solid #1e1e2d; border-radius: 12px; padding: 18px; margin-bottom: 25px;">
+                                                <code style="color: #ffffff; font-size: 18px; font-weight: 700; font-family: 'JetBrains Mono', 'Courier New', monospace; word-break: break-all;">
+                                                    ${data.password || data.acc_password || "..."}
+                                                </code>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <!-- Thông tin thêm -->
+                                    ${(data.note || data.acc_info) ? `
+                                    <tr>
+                                        <td>
+                                            <div style="color: #a1a1aa; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 10px;">
+                                                 LƯU Ý QUAN TRỌNG
+                                            </div>
+                                            <div style="background: rgba(139, 92, 246, 0.05); border-left: 4px solid #8b5cf6; padding: 15px; border-radius: 4px;">
+                                                <p style="margin: 0; color: #d4d4d8; font-size: 14px; font-style: italic; line-height: 1.6;">
+                                                    ${data.note || data.acc_info}
+                                                </p>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    ` : ''}
+                                </table>
+                            </div>
+
+                            <!-- Dashboard Link -->
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td align="center">
+                                        <a href="https://napgameuytin.vn/account?tab=acc-history" style="display: inline-block; background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); color: #ffffff; padding: 18px 35px; border-radius: 15px; text-decoration: none; font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);">
+                                            📥 Truy cập Lịch sử Mua hàng
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Receipt Sidebar-like section -->
+                    <tr>
+                        <td style="padding: 0 35px 40px 35px;">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: #11111a; border-radius: 15px; padding: 25px;">
+                                <tr>
+                                    <td style="color: #71717a; font-size: 13px;">Thời gian giao dịch</td>
+                                    <td align="right" style="color: #e4e4e7; font-size: 13px; font-weight: 600;">${orderDate}</td>
+                                </tr>
+                                <tr>
+                                    <td style="padding-top: 15px; color: #71717a; font-size: 13px;">Tổng thanh toán</td>
+                                    <td align="right" style="padding-top: 15px; color: #10b981; font-size: 16px; font-weight: 700;">${formattedPrice}</td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Security Alert -->
+                    <tr>
+                        <td style="background-color: #1a1a24; padding: 25px 35px;">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td style="color: #fca5a5; font-size: 13px; line-height: 1.6; text-align: center;">
+                                        ⚠️ <strong>CẢNH BÁO BẢO MẬT:</strong> Chúng tôi khuyến nghị bạn <strong>đổi mật khẩu ngay lập tức</strong> sau khi đăng nhập thành công để đảm bảo an toàn tuyệt đối cho tài khoản.
+                                    </td>
+                                </tr>
+                            </table>
                         </td>
                     </tr>
 
                     <!-- Footer -->
                     <tr>
-                        <td style="background-color: #F8FAFC; padding: 30px; text-align: center; border-top: 1px solid #E2E8F0;">
-                             <p style="margin: 0 0 10px 0; color: ${STYLES.textMuted}; font-size: 14px; font-weight: 600;">Hệ thống nạp game tự động hàng đầu Việt Nam</p>
-                             <div style="margin-bottom: 20px;">
-                                <a href="https://napgameuytin.vn" style="color: ${STYLES.brandColor}; text-decoration: none; margin: 0 10px; font-size: 14px;">Trang chủ</a>
-                                <a href="https://napgameuytin.vn/user/history" style="color: ${STYLES.brandColor}; text-decoration: none; margin: 0 10px; font-size: 14px;">Lịch sử</a>
-                                <a href="#" style="color: ${STYLES.brandColor}; text-decoration: none; margin: 0 10px; font-size: 14px;">Hỗ trợ</a>
-                             </div>
-                             <p style="margin: 0; color: #9CA3AF; font-size: 12px;">
-                                © 2026 Napgameuytin. All rights reserved.<br>
-                                Email này được gửi tự động. Vui lòng không phản hồi trực tiếp.
-                             </p>
+                        <td style="padding: 40px; text-align: center; border-top: 1px solid #1e1e2d;">
+                            <img src="cid:logo" alt="Napgameuytin Logo" style="height: 35px; border-radius: 8px; margin-bottom: 20px; opacity: 0.8;">
+                            <p style="margin: 0; color: #52525b; font-size: 12px; line-height: 1.8;">
+                                © 2026 Napgameuytin.vn - Hệ thống nạp game tự động hàng đầu.<br>
+                                Đây là email tự động, vui lòng không trả lời.
+                            </p>
                         </td>
                     </tr>
                 </table>
-
-                <!-- Bottom Branding -->
-                <p style="text-align: center; margin-top: 20px; color: #9CA3AF; font-size: 12px;">Uy tín - Nhanh chóng - Bảo mật</p>
+                
+                <!-- Extra Space -->
+                <div style="height: 40px;"></div>
             </td>
         </tr>
     </table>
 </body>
 </html>
-    `;
+        `.trim();
+
+        const info = await transporter.sendMail({
+            from: '"Napgameuytin" <napgameuytin2111@gmail.com>',
+            to: email,
+            subject: `🎁 [TÀI KHOẢN MỚI] Giao hàng thành công: Đơn hàng #${order.id}`,
+            html,
+            attachments: [logoAttachment]
+        });
+
+        console.log("✅ Acc sent:", info.messageId);
+        return info;
+    } catch (error) {
+        console.error("❌ Send Acc Error:", error);
+        throw error;
+    }
 }
 
-// ===================== SEND OTP ĐĂNG KÝ =====================
-async function sendOTP(email, otp) {
-  try {
-    const content = `
-            <p style="font-size: 16px;">Chào gamer <strong>${email.split('@')[0]}</strong> 👋,</p>
-            <p style="font-size: 16px;">Chào mừng bạn gia nhập thế giới <strong>Napgameuytin</strong>! Để bắt đầu hành trình, chúng tôi cần xác minh đây chính là bạn.</p>
-            
-            <div style="margin: 35px 0; text-align: center;">
-                <p style="font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: ${STYLES.textMuted}; font-weight: 700; margin-bottom: 10px;">MÃ KÍCH HOẠT CỦA BẠN</p>
-                <div style="display: inline-block; background: #F3F4F6; border: 2px solid #E5E7EB; border-radius: 12px; padding: 15px 40px; position: relative; overflow: hidden;">
-                    <span style="font-family: 'Courier New', monospace; font-size: 36px; font-weight: 800; color: ${STYLES.brandColor}; letter-spacing: 8px; position: relative; z-index: 1;">${otp}</span>
-                </div>
-            </div>
-
-            <div style="background: #FFFBEB; border-left: 4px solid #F59E0B; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
-                <p style="margin: 0; color: #92400E; font-size: 14px;"><strong>Lưu ý:</strong> Mã này có hiệu lực trong 5 phút và chỉ dành riêng cho bạn. Đừng đưa nó cho bất kỳ ai (kể cả Admin).</p>
-            </div>
-        `;
-
-    const html = baseTemplate("Xác minh tài khoản", "Mã OTP kích hoạt tài khoản của bạn", content, 'default');
-
-    const info = await transporter.sendMail({
-      from: '"Napgameuytin Team" <napgameuytin2111@gmail.com>',
-      to: email,
-      subject: "🚀 Kích hoạt tài khoản Napgameuytin của bạn",
-      html,
-    });
-
-    console.log("✅ Email OTP Register sent:", info.messageId);
-    return info;
-  } catch (error) {
-    console.error("❌ Send OTP Register Error:", error);
-    throw error;
-  }
-}
-
-// ===================== SEND OTP KHÔI PHỤC MẬT KHẨU =====================
-async function sendOTPRePass(email, otp) {
-  try {
-    const content = `
-            <div style="text-align: center; margin-bottom: 25px;">
-                <div style="font-size: 48px; margin-bottom: 10px;">${ICONS.shield}</div>
-                <p style="font-size: 16px; margin: 0;">Hệ thống nhận được yêu cầu đặt lại mật khẩu cho tài khoản:</p>
-                <strong style="color: ${STYLES.securityColor}; font-size: 18px;">${email}</strong>
-            </div>
-            
-            <div style="margin: 30px 0; text-align: center;">
-                <p style="font-size: 12px; text-transform: uppercase; letter-spacing: 2px; color: ${STYLES.errorColor}; font-weight: 700; margin-bottom: 10px;">Mã Bảo Mật 🔐</p>
-                <div style="display: inline-block; background: #FFF1F2; border: 2px dashed #FECACA; border-radius: 12px; padding: 15px 40px;">
-                    <span style="font-family: 'Courier New', monospace; font-size: 36px; font-weight: 800; color: ${STYLES.errorColor}; letter-spacing: 8px;">${otp}</span>
-                </div>
-            </div>
-
-            <div style="background: #F8FAFC; border-radius: 8px; padding: 15px; text-align: center;">
-                <p style="font-size: 14px; color: ${STYLES.textMuted}; margin-bottom: 5px;">Mã này sẽ hết hạn trong <strong>5 phút</strong>.</p>
-                <p style="font-size: 14px; color: ${STYLES.textMuted}; margin: 0;">Nếu bạn không yêu cầu, vui lòng đổi mật khẩu ngay lập tức vì có thể tài khoản của bạn đang bị xâm nhập.</p>
-            </div>
-        `;
-
-    // Use 'security' theme for Red/Alert styling
-    const html = baseTemplate("CẢNH BÁO BẢO MẬT", "Yêu cầu đặt lại mật khẩu của bạn", content, 'security');
-
-    const info = await transporter.sendMail({
-      from: '"Napgameuytin Security" <napgameuytin2111@gmail.com>',
-      to: email,
-      subject: "🔐 [CẢNH BÁO] Mã xác thực khôi phục mật khẩu",
-      html,
-    });
-
-    console.log("✅ Email OTP Reset sent:", info.messageId);
-    return info;
-  } catch (error) {
-    console.error("❌ Send OTP Reset Error:", error);
-    throw error;
-  }
-}
-
-// ===================== SEND ACC ĐÃ MUA =====================
-async function sendAcc(email, data, order) {
-  try {
-    const formattedPrice = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.price ?? 0);
-
-    const content = `
-            <p style="font-size: 16px; margin-bottom: 20px;">Chúc mừng bạn! Giao dịch thành công 🎉</p>
-            <p style="font-size: 14px; margin-bottom: 30px; color: ${STYLES.textMuted};">Cảm ơn bạn đã tin tưởng dịch vụ tại Napgameuytin. Dưới đây là "chiến lợi phẩm" của bạn:</p>
-            
-            <!-- Account Card -->
-            <div style="background: linear-gradient(to right, #ffffff, #F8FAFC); border: 2px solid ${STYLES.brandColor}; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);">
-                <div style="background: ${STYLES.brandColor}; color: white; padding: 10px 20px; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
-                    💎 Thông tin tài khoản
-                </div>
-                <div style="padding: 25px;">
-                    <!-- Username -->
-                    <div style="margin-bottom: 20px;">
-                        <span style="display: block; font-size: 12px; color: ${STYLES.textMuted}; text-transform: uppercase; font-weight: 600; margin-bottom: 5px;">Tài khoản đăng nhập</span>
-                        <div style="background: #F1F5F9; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 16px; color: ${STYLES.textMain}; font-weight: 700; border: 1px solid #E2E8F0;">
-                            ${data.account}
-                        </div>
-                    </div>
-                    
-                    <!-- Password -->
-                    <div style="margin-bottom: 20px;">
-                        <span style="display: block; font-size: 12px; color: ${STYLES.textMuted}; text-transform: uppercase; font-weight: 600; margin-bottom: 5px;">Mật khẩu</span>
-                        <div style="background: #F1F5F9; padding: 12px; border-radius: 8px; font-family: monospace; font-size: 16px; color: ${STYLES.textMain}; font-weight: 700; border: 1px solid #E2E8F0;">
-                            ${data.password}
-                        </div>
-                    </div>
-
-                    <!-- Note -->
-                    ${data.note ? `
-                    <div>
-                        <span style="display: block; font-size: 12px; color: ${STYLES.textMuted}; text-transform: uppercase; font-weight: 600; margin-bottom: 5px;">Ghi chú từ hệ thống</span>
-                        <div style="font-size: 14px; color: ${STYLES.textMain}; font-style: italic;">
-                            "${data.note}"
-                        </div>
-                    </div>` : ''}
-                </div>
-            </div>
-
-            <!-- Receipt Info -->
-            <div style="margin-top: 30px; background: #FFF; border-radius: 12px; border: 1px dashed #CBD5E1; padding: 20px;">
-                <h3 style="margin: 0 0 15px 0; font-size: 14px; color: ${STYLES.textMain}; text-transform: uppercase;">🧾 Hóa đơn #${order.id}</h3>
-                <div style="display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px;">
-                     <span style="color: ${STYLES.textMuted};">Ngày mua:</span>
-                     <span style="font-weight: 600;">${new Date(order.create_at).toLocaleString('vi-VN')}</span>
-                </div>
-                 <div style="display: flex; justify-content: space-between; font-size: 14px;">
-                     <span style="color: ${STYLES.textMuted};">Tổng thanh toán:</span>
-                     <span style="font-weight: 700; color: ${STYLES.brandColor}; font-size: 16px;">${formattedPrice}</span>
-                </div>
-            </div>
-
-            <div style="margin-top: 25px; text-align: center;">
-                <p style="font-size: 13px; color: ${STYLES.errorColor}; background: #FFF1F2; padding: 10px; border-radius: 8px; display: inline-block;">
-                    ⚠️ Quý khách vui lòng đổi mật khẩu ngay sau khi đăng nhập để đảm bảo quyền lợi.
-                </p>
-            </div>
-        `;
-
-    const html = baseTemplate("Thanh toán thành công", `Đơn hàng #${order.id} của bạn đã hoàn tất`, content, 'default');
-
-    const info = await transporter.sendMail({
-      from: '"Napgameuytin Store" <napgameuytin2111@gmail.com>',
-      to: email,
-      subject: `💎 Nhận acc ngay: Đơn hàng #${order.id}`,
-      html,
-    });
-
-    console.log("✅ Acc sent:", info.messageId);
-    return info;
-  } catch (error) {
-    console.error("❌ Send Acc Error:", error);
-    throw error;
-  }
-}
-
-// ===================== SEND TRẠNG THÁI ĐƠN =====================
+// ═══════════════════════════════════════════════════════════════════════════════
+//                          📊 SEND STATUS - CẬP NHẬT TRẠNG THÁI
+// ═══════════════════════════════════════════════════════════════════════════════
 async function sendStatus(email, order) {
-  try {
-    const formattedAmount = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(order.amount ?? 0);
+    try {
+        const formattedAmount = new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND'
+        }).format(order.amount ?? 0);
 
-    const statusConfig = {
-      success: { text: "Thành công", color: STYLES.successColor, icon: ICONS.check, msg: "Giao dịch của bạn đã hoàn tất xuất sắc." },
-      cancel: { text: "Thất bại / Hủy", color: STYLES.errorColor, icon: ICONS.cross, msg: "Giao dịch đã bị hủy. Nếu có nhầm lẫn, hãy liên hệ ngay." },
-      pending: { text: "Chờ xử lý", color: STYLES.warningColor, icon: ICONS.clock, msg: "Hệ thống đang kiểm tra giao dịch của bạn." },
-      processing: { text: "Đang thực hiện", color: STYLES.brandColor, icon: ICONS.sync, msg: "Vui lòng đợi trong giây lát, chúng tôi đang xử lý." },
-    };
+        const statusConfig = {
+            success: {
+                text: "Thành Công",
+                color: THEME.success,
+                bg: THEME.successBg,
+                icon: "✅",
+                msg: "Giao dịch của bạn đã hoàn tất thành công!",
+                gradient: THEME.gradientSuccess
+            },
+            cancel: {
+                text: "Đã Hủy",
+                color: THEME.error,
+                bg: THEME.errorBg,
+                icon: "❌",
+                msg: "Giao dịch đã bị hủy. Liên hệ hỗ trợ nếu cần.",
+                gradient: THEME.gradientDanger
+            },
+            pending: {
+                text: "Chờ Xử Lý",
+                color: THEME.warning,
+                bg: THEME.warningBg,
+                icon: "⏳",
+                msg: "Hệ thống đang kiểm tra giao dịch của bạn.",
+                gradient: THEME.gradientPrimary
+            },
+            processing: {
+                text: "Đang Xử Lý",
+                color: THEME.info,
+                bg: THEME.infoBg,
+                icon: "🔄",
+                msg: "Vui lòng đợi, chúng tôi đang xử lý đơn hàng.",
+                gradient: THEME.gradientPrimary
+            },
+        };
 
-    const currentStatus = statusConfig[order.status] || { text: order.status, color: STYLES.textMuted, icon: "ℹ️", msg: "Trạng thái mới." };
+        const status = statusConfig[order.status] || {
+            text: order.status,
+            color: THEME.textMuted,
+            bg: THEME.bgCard,
+            icon: "ℹ️",
+            msg: "Trạng thái giao dịch đã được cập nhật.",
+            gradient: THEME.gradientPrimary
+        };
 
-    const content = `
-            <div style="text-align: center; padding: 20px 0;">
-                <div style="font-size: 60px; line-height: 1; margin-bottom: 15px;">${currentStatus.icon}</div>
-                <h2 style="color: ${currentStatus.color}; margin: 0 0 10px 0; text-transform: uppercase; font-size: 24px; font-weight: 800;">${currentStatus.text}</h2>
-                <p style="margin: 0; color: ${STYLES.textMuted}; font-size: 16px;">${currentStatus.msg}</p>
-            </div>
+        const content = `
+            <!-- Status Display -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="text-align: center; margin-bottom: 30px;">
+                <tr>
+                    <td>
+                        <div style="width: 100px; height: 100px; background: ${status.bg}; border-radius: 50%; display: inline-block; line-height: 100px; font-size: 50px; margin-bottom: 20px; border: 3px solid ${status.color};">
+                            ${status.icon}
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <h2 style="margin: 0 0 10px 0; color: ${status.color}; font-size: 28px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">
+                            ${status.text}
+                        </h2>
+                        <p style="margin: 0; color: ${THEME.textSecondary}; font-size: 15px;">
+                            ${status.msg}
+                        </p>
+                    </td>
+                </tr>
+            </table>
 
-            <div style="background: #F8FAFC; border-radius: 12px; padding: 25px; margin-top: 20px; border: 1px solid #E2E8F0;">
-                <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                    <tr>
-                        <td style="padding: 10px 0; color: ${STYLES.textMuted}; font-size: 14px;">Mã đơn hàng</td>
-                        <td style="padding: 10px 0; text-align: right; font-weight: 700; color: ${STYLES.textMain};">#${order.id}</td>
-                    </tr>
-                    <tr>
-                         <td style="padding: 10px 0; color: ${STYLES.textMuted}; font-size: 14px; border-bottom: 1px dashed #E2E8F0;">Số tiền giao dịch</td>
-                        <td style="padding: 10px 0; text-align: right; font-weight: 700; color: ${STYLES.textMain}; border-bottom: 1px dashed #E2E8F0;">${formattedAmount}</td>
-                    </tr>
-                    <tr>
-                        <td colspan="2" style="padding-top: 20px; text-align: center;">
-                             <a href="https://napgameuytin.vn/user/history" style="display: inline-block; background: ${STYLES.textMain}; color: #FFF; padding: 12px 30px; border-radius: 50px; text-decoration: none; font-weight: 600; font-size: 14px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">Kiểm tra lịch sử</a>
-                        </td>
-                    </tr>
-                </table>
-            </div>
+            <!-- Order Details Card -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: ${THEME.bgCard}; border-radius: 16px; border: 1px solid ${THEME.borderAccent}; overflow: hidden; margin-bottom: 25px;">
+                <tr>
+                    <td style="padding: 25px;">
+                        <!-- Order ID -->
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 15px;">
+                            <tr>
+                                <td style="color: ${THEME.textMuted}; font-size: 14px;">Mã đơn hàng</td>
+                                <td align="right" style="color: ${THEME.primary}; font-size: 16px; font-weight: 700;">#${order.id}</td>
+                            </tr>
+                        </table>
+                        <!-- Divider -->
+                        <div style="border-top: 1px dashed ${THEME.borderSubtle}; margin: 15px 0;"></div>
+                        <!-- Amount -->
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                                <td style="color: ${THEME.textMuted}; font-size: 14px;">Số tiền giao dịch</td>
+                                <td align="right" style="color: ${THEME.textPrimary}; font-size: 18px; font-weight: 700;">${formattedAmount}</td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
 
-            <p style="text-align: center; margin-top: 25px; font-size: 13px; color: ${STYLES.textMuted};">Cần hỗ trợ? Phản hồi email này hoặc chat trực tiếp trên web.</p>
+            <!-- CTA Button -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                    <td align="center">
+                        <a href="https://napgameuytin.vn/user/history" style="display: inline-block; background: ${THEME.gradientPrimary}; color: #FFFFFF; padding: 16px 40px; border-radius: 50px; text-decoration: none; font-weight: 600; font-size: 14px; box-shadow: 0 8px 20px ${THEME.primaryGlow};">
+                            📋 Xem lịch sử giao dịch
+                        </a>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Support Note -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 25px;">
+                <tr>
+                    <td align="center">
+                        <p style="margin: 0; color: ${THEME.textMuted}; font-size: 13px;">
+                            Cần hỗ trợ? <a href="https://napgameuytin.vn/support" style="color: ${THEME.primary}; text-decoration: none;">Chat ngay</a> hoặc phản hồi email này.
+                        </p>
+                    </td>
+                </tr>
+            </table>
         `;
 
-    const html = baseTemplate("Cập nhật trạng thái", `Đơn hàng #${order.id}: ${currentStatus.text}`, content, 'default');
+        const html = baseTemplate({
+            title: "Cập Nhật Trạng Thái",
+            subtitle: `Đơn hàng #${order.id}: ${status.text}`,
+            content,
+            headerGradient: status.gradient,
+            headerIcon: "📊"
+        });
 
-    const info = await transporter.sendMail({
-      from: '"Napgameuytin Support" <napgameuytin2111@gmail.com>',
-      to: email,
-      subject: `🔔 Đơn hàng #${order.id}: ${currentStatus.text.toUpperCase()}`,
-      html,
-    });
+        const info = await transporter.sendMail({
+            from: '"Napgameuytin Support" <napgameuytin2111@gmail.com>',
+            to: email,
+            subject: `🔔 Đơn hàng #${order.id}: ${status.text.toUpperCase()}`,
+            html,
+            attachments: [logoAttachment]
+        });
 
-    console.log("✅ Email Status sent:", info.messageId);
-    return info;
-  } catch (error) {
-    console.error("❌ Send Status Error:", error);
-    throw error;
-  }
+        console.log("✅ Status email sent:", info.messageId);
+        return info;
+    } catch (error) {
+        console.error("❌ Send Status Error:", error);
+        throw error;
+    }
 }
 
-module.exports = { sendOTP, sendOTPRePass, sendAcc, sendStatus };
+// ═══════════════════════════════════════════════════════════════════════════════
+//                          SEND ADMIN BALANCE OTP - ADMIN THAO TÁC SỐ DƯ
+// ═══════════════════════════════════════════════════════════════════════════════
+async function sendAdminBalanceOTP(email, otp) {
+    try {
+        const otpDigits = otp.toString().split('');
+
+        const content = `
+            <!-- Admin Badge Header -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 25px;">
+                <tr>
+                    <td align="center">
+                        <div style="width: 90px; height: 90px; background: linear-gradient(135deg, #F59E0B 0%, #D97706 100%); border-radius: 50%; display: inline-block; line-height: 90px; font-size: 45px; margin-bottom: 15px; box-shadow: 0 8px 25px rgba(245, 158, 11, 0.4);">
+                            👑
+                        </div>
+                        <p style="margin: 0 0 8px 0; color: ${THEME.warning}; font-size: 12px; text-transform: uppercase; letter-spacing: 3px; font-weight: 700;">
+                            Xác Thực Admin
+                        </p>
+                        <p style="margin: 0; color: ${THEME.textSecondary}; font-size: 15px; line-height: 1.7;">
+                            Hệ thống nhận được yêu cầu thao tác <strong style="color: ${THEME.textPrimary};">số dư người dùng</strong>.
+                        </p>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Admin Info Box -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: ${THEME.warningBg}; border-radius: 12px; border: 1px solid rgba(245, 158, 11, 0.3); margin-bottom: 25px;">
+                <tr>
+                    <td style="padding: 18px; text-align: center;">
+                        <p style="margin: 0; color: ${THEME.textSecondary}; font-size: 13px;">
+                            Đang thao tác với tư cách:
+                        </p>
+                        <p style="margin: 6px 0 0 0; color: ${THEME.warning}; font-size: 16px; font-weight: 700;">
+                            🔐 ${email}
+                        </p>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- OTP Box - Gold Theme -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: ${THEME.bgCard}; border-radius: 16px; border: 2px solid ${THEME.warning}; overflow: hidden; box-shadow: 0 0 30px rgba(245, 158, 11, 0.15);">
+                <tr>
+                    <td style="padding: 35px 25px; text-align: center;">
+                        <p style="margin: 0 0 20px 0; color: ${THEME.warning}; font-size: 12px; text-transform: uppercase; letter-spacing: 3px; font-weight: 700;">
+                            👑 Mã Xác Thực Admin
+                        </p>
+                        <!-- OTP Digits -->
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                            <tr>
+                                ${otpDigits.map(digit => `
+                                    <td style="padding: 0 6px;">
+                                        <div style="width: 52px; height: 64px; background: linear-gradient(180deg, #1A1A24 0%, #12121A 100%); border: 2px solid ${THEME.warning}; border-radius: 12px; font-size: 28px; font-weight: 700; color: ${THEME.warning}; line-height: 60px; text-align: center; font-family: 'Courier New', monospace; box-shadow: 0 4px 12px rgba(245, 158, 11, 0.2);">
+                                            ${digit}
+                                        </div>
+                                    </td>
+                                `).join('')}
+                            </tr>
+                        </table>
+                        <p style="margin: 20px 0 0 0; color: ${THEME.textMuted}; font-size: 13px;">
+                            ⏱️ Mã có hiệu lực trong <strong style="color: ${THEME.warning};">5 phút</strong>
+                        </p>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Action Info -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 25px;">
+                <tr>
+                    <td style="background: ${THEME.bgCard}; border-radius: 12px; padding: 20px;">
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                                <td width="40" valign="top" style="padding-right: 15px;">
+                                    <div style="font-size: 24px;">💰</div>
+                                </td>
+                                <td>
+                                    <p style="margin: 0 0 5px 0; color: ${THEME.textPrimary}; font-size: 14px; font-weight: 600;">
+                                        Thao tác yêu cầu xác thực
+                                    </p>
+                                    <p style="margin: 0; color: ${THEME.textSecondary}; font-size: 13px; line-height: 1.6;">
+                                        Cộng/Trừ số dư tài khoản người dùng. Nếu bạn không thực hiện yêu cầu này, vui lòng bỏ qua email.
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Security Warning -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 20px;">
+                <tr>
+                    <td style="background: ${THEME.errorBg}; border-left: 4px solid ${THEME.error}; border-radius: 8px; padding: 15px 18px;">
+                        <p style="margin: 0; color: ${THEME.error}; font-size: 13px; line-height: 1.6;">
+                            <strong>⚠️ Cảnh báo bảo mật:</strong> Không chia sẻ mã này với bất kỳ ai, kể cả nhân viên khác. Mỗi thao tác sẽ được ghi log.
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        `;
+
+        const html = baseTemplate({
+            title: "Xác Thực Admin",
+            subtitle: "Yêu cầu thao tác số dư người dùng",
+            content,
+            headerGradient: "linear-gradient(135deg, #F59E0B 0%, #D97706 50%, #B45309 100%)",
+            headerIcon: "👑"
+        });
+
+        const info = await transporter.sendMail({
+            from: '"Napgameuytin Admin" <napgameuytin2111@gmail.com>',
+            to: email,
+            subject: "👑 [ADMIN] Mã xác thực thao tác số dư",
+            html,
+            attachments: [logoAttachment]
+        });
+
+        console.log("✅ Admin Balance OTP sent:", info.messageId);
+        return info;
+    } catch (error) {
+        console.error("❌ Send Admin Balance OTP Error:", error);
+        throw error;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//                          🎖️ SEND ROLE PROMOTION OTP - THĂNG CẤP QUYỀN
+// ═══════════════════════════════════════════════════════════════════════════════
+async function sendRolePromotionOTP(email, otp, targetUserEmail, newRole) {
+    try {
+        const otpDigits = otp.toString().split('');
+
+        const roleLabels = {
+            admin: { text: "Quản Trị Viên (Admin)", icon: "�", color: "#EF4444" },
+            agent: { text: "Cộng Tác Viên (Agent)", icon: "🎖️", color: "#06B6D4" },
+            user: { text: "Người Dùng", icon: "👤", color: "#6B7280" }
+        };
+
+        const roleInfo = roleLabels[newRole] || { text: newRole, icon: "🔄", color: THEME.primary };
+
+        const content = `
+            <!-- Promotion Header -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 25px;">
+                <tr>
+                    <td align="center">
+                        <div style="width: 90px; height: 90px; background: linear-gradient(135deg, #06B6D4 0%, #0891B2 100%); border-radius: 50%; display: inline-block; line-height: 90px; font-size: 45px; margin-bottom: 15px; box-shadow: 0 8px 25px rgba(6, 182, 212, 0.4);">
+                            🎖️
+                        </div>
+                        <p style="margin: 0 0 8px 0; color: ${THEME.accent}; font-size: 12px; text-transform: uppercase; letter-spacing: 3px; font-weight: 700;">
+                            Thăng Cấp Quyền Hạn
+                        </p>
+                        <p style="margin: 0; color: ${THEME.textSecondary}; font-size: 15px; line-height: 1.7;">
+                            Yêu cầu thay đổi quyền hạn người dùng
+                        </p>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Target User Info -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: ${THEME.bgCard}; border-radius: 12px; border: 1px solid ${THEME.borderAccent}; margin-bottom: 25px;">
+                <tr>
+                    <td style="padding: 20px;">
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                                <td style="padding-bottom: 15px; border-bottom: 1px dashed ${THEME.borderSubtle};">
+                                    <p style="margin: 0 0 5px 0; color: ${THEME.textMuted}; font-size: 11px; text-transform: uppercase; letter-spacing: 1px;">
+                                        Tài khoản được thăng cấp
+                                    </p>
+                                    <p style="margin: 0; color: ${THEME.textPrimary}; font-size: 16px; font-weight: 600;">
+                                        📧 ${targetUserEmail}
+                                    </p>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td style="padding-top: 15px;">
+                                    <p style="margin: 0 0 5px 0; color: ${THEME.textMuted}; font-size: 11px; text-transform: uppercase; letter-spacing: 1px;">
+                                        Quyền hạn mới
+                                    </p>
+                                    <div style="display: inline-block; background: ${roleInfo.color}20; border: 1px solid ${roleInfo.color}; border-radius: 8px; padding: 8px 16px;">
+                                        <span style="color: ${roleInfo.color}; font-size: 16px; font-weight: 700;">
+                                            ${roleInfo.icon} ${roleInfo.text}
+                                        </span>
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- OTP Box - Cyan Theme -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: ${THEME.bgCard}; border-radius: 16px; border: 2px solid ${THEME.accent}; overflow: hidden; box-shadow: 0 0 30px ${THEME.accentGlow};">
+                <tr>
+                    <td style="padding: 35px 25px; text-align: center;">
+                        <p style="margin: 0 0 20px 0; color: ${THEME.accent}; font-size: 12px; text-transform: uppercase; letter-spacing: 3px; font-weight: 700;">
+                            🎖️ Mã Xác Thực Thăng Cấp
+                        </p>
+                        <!-- OTP Digits -->
+                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                            <tr>
+                                ${otpDigits.map(digit => `
+                                    <td style="padding: 0 6px;">
+                                        <div style="width: 52px; height: 64px; background: linear-gradient(180deg, #1A1A24 0%, #12121A 100%); border: 2px solid ${THEME.accent}; border-radius: 12px; font-size: 28px; font-weight: 700; color: ${THEME.accent}; line-height: 60px; text-align: center; font-family: 'Courier New', monospace; box-shadow: 0 4px 12px ${THEME.accentGlow};">
+                                            ${digit}
+                                        </div>
+                                    </td>
+                                `).join('')}
+                            </tr>
+                        </table>
+                        <p style="margin: 20px 0 0 0; color: ${THEME.textMuted}; font-size: 13px;">
+                            ⏱️ Mã có hiệu lực trong <strong style="color: ${THEME.accent};">5 phút</strong>
+                        </p>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Admin Action Info -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 25px;">
+                <tr>
+                    <td style="background: ${THEME.infoBg}; border-radius: 12px; padding: 20px;">
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                                <td width="40" valign="top" style="padding-right: 15px;">
+                                    <div style="font-size: 24px;">🔐</div>
+                                </td>
+                                <td>
+                                    <p style="margin: 0 0 5px 0; color: ${THEME.textPrimary}; font-size: 14px; font-weight: 600;">
+                                        Xác thực quyền Admin
+                                    </p>
+                                    <p style="margin: 0; color: ${THEME.textSecondary}; font-size: 13px; line-height: 1.6;">
+                                        Đang thực hiện với tư cách: <strong style="color: ${THEME.primary};">${email}</strong>
+                                    </p>
+                                </td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Security Warning -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 20px;">
+                <tr>
+                    <td style="background: ${THEME.errorBg}; border-left: 4px solid ${THEME.error}; border-radius: 8px; padding: 15px 18px;">
+                        <p style="margin: 0; color: ${THEME.error}; font-size: 13px; line-height: 1.6;">
+                            <strong>⚠️ Cảnh báo:</strong> Thay đổi quyền hạn là thao tác quan trọng. Không chia sẻ mã này với bất kỳ ai.
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        `;
+
+        const html = baseTemplate({
+            title: "Thăng Cấp Quyền Hạn",
+            subtitle: `Yêu cầu thăng cấp lên ${roleInfo.text}`,
+            content,
+            headerGradient: "linear-gradient(135deg, #06B6D4 0%, #0891B2 50%, #0E7490 100%)",
+            headerIcon: "🎖️"
+        });
+
+        const info = await transporter.sendMail({
+            from: '"Napgameuytin Admin" <napgameuytin2111@gmail.com>',
+            to: email,
+            subject: `🎖️ [ADMIN] Xác thực thăng cấp ${roleInfo.text}`,
+            html,
+            attachments: [logoAttachment]
+        });
+
+        console.log("✅ Role Promotion OTP sent:", info.messageId);
+        return info;
+    } catch (error) {
+        console.error("❌ Send Role Promotion OTP Error:", error);
+        throw error;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//                              �📦 EXPORTS
+// ═══════════════════════════════════════════════════════════════════════════════
+module.exports = {
+    sendOTP,
+    sendOTPRePass,
+    sendAcc,
+    sendStatus,
+    sendAdminBalanceOTP,
+    sendRolePromotionOTP
+};

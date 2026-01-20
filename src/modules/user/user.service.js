@@ -15,6 +15,7 @@ const UserService = {
             email: users.email,
             balance: users.balance,
             role: users.role,
+            level: users.level,
             created_at: users.created_at
         }).from(users).where(eq(users.id, userId));
 
@@ -31,6 +32,7 @@ const UserService = {
             email: users.email,
             hash_password: users.hash_password,
             role: users.role,
+            level: users.level,
             balance: users.balance,
             status: users.status,
             created_at: users.created_at,
@@ -65,7 +67,7 @@ const UserService = {
             .where(eq(users.id, targetUserId));
 
         const [updatedUser] = await db.select({
-            id: users.id, name: users.name, email: users.email, role: users.role, balance: users.balance, created_at: users.created_at
+            id: users.id, name: users.name, email: users.email, role: users.role, level: users.level, balance: users.balance, created_at: users.created_at
         }).from(users).where(eq(users.id, targetUserId));
 
         return { message: "Cập nhật role thành công", user: updatedUser };
@@ -77,7 +79,7 @@ const UserService = {
         }
 
         const [userInfo] = await db.select({
-            id: users.id, name: users.name, email: users.email, balance: users.balance, role: users.role, created_at: users.created_at
+            id: users.id, name: users.name, email: users.email, balance: users.balance, role: users.role, level: users.level, created_at: users.created_at
         }).from(users).where(eq(users.id, userId));
 
         if (!userInfo) {
@@ -111,7 +113,11 @@ const UserService = {
 
             // Prevent negative balance on debit
             if (type === "debit" && balanceAfter < 0) {
-                throw { status: 400, message: "Số dư không đủ" };
+                const missing = amount - balanceBefore;
+                throw {
+                    status: 400,
+                    message: `Số dư không đủ! Hiện có: ${balanceBefore.toLocaleString('vi-VN')}đ. Cần: ${amount.toLocaleString('vi-VN')}đ. Thiếu: ${missing.toLocaleString('vi-VN')}đ. Vui lòng nạp thêm!`
+                };
             }
 
             // Update User Balance
@@ -176,6 +182,7 @@ const UserService = {
             email: users.email,
             hash_password: users.hash_password,
             role: users.role,
+            level: users.level,
             balance: users.balance,
             status: users.status,
             created_at: users.created_at,
@@ -227,6 +234,45 @@ const UserService = {
             success: true,
             locked: isLocked,
             message: isLocked ? "Đã khóa tài khoản" : "Đã mở khóa tài khoản"
+        };
+    },
+
+    // Level labels: 1=Basic, 2=Pro, 3=Plus
+    updateUserLevel: async (targetUserId, newLevel) => {
+        if (!targetUserId || !newLevel) {
+            throw { status: 400, message: "Thiếu tham số bắt buộc" };
+        }
+
+        const level = parseInt(newLevel);
+        if (![1, 2, 3].includes(level)) {
+            throw { status: 400, message: "Level phải là 1 (Basic), 2 (Pro), hoặc 3 (Plus)" };
+        }
+
+        const [targetUser] = await db.select().from(users).where(eq(users.id, targetUserId));
+
+        if (!targetUser) {
+            throw { status: 404, message: "Không tìm thấy người dùng" };
+        }
+
+        await db.update(users)
+            .set({ level: level })
+            .where(eq(users.id, targetUserId));
+
+        const levelLabels = { 1: "Basic", 2: "Pro", 3: "Plus" };
+
+        const [updatedUser] = await db.select({
+            id: users.id,
+            name: users.name,
+            email: users.email,
+            role: users.role,
+            level: users.level,
+            balance: users.balance
+        }).from(users).where(eq(users.id, targetUserId));
+
+        return {
+            success: true,
+            message: `Đã cập nhật level thành ${levelLabels[level]}`,
+            user: updatedUser
         };
     }
 };
