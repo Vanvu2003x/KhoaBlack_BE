@@ -2,6 +2,8 @@ const { db } = require("../../configs/drizzle");
 const { orders, users, topupPackages, games, walletLogs, balanceHistory } = require("../../db/schema");
 const { eq, ilike, or, and, sql, desc, aliasedTable } = require("drizzle-orm");
 const UserService = require("../user/user.service");
+const { sendOrderSuccessEmail, sendOrderFailureEmail } = require("../../services/nodemailer.service");
+
 
 // Helper to construct the base query with joins
 const buildOrderQuery = () => {
@@ -304,7 +306,19 @@ const OrderService = {
     },
 
     completeOrder: async (id) => {
-        return OrderService.updateOrderStatus(id, "success");
+        const updatedOrder = await OrderService.updateOrderStatus(id, "success");
+
+        // Send email notification (non-blocking)
+        if (updatedOrder && updatedOrder.user_email) {
+            try {
+                await sendOrderSuccessEmail(updatedOrder.user_email, updatedOrder);
+            } catch (emailError) {
+                console.error('❌ Failed to send order success email:', emailError);
+                // Don't throw - we don't want email failures to fail the order completion
+            }
+        }
+
+        return updatedOrder;
     },
 
     cancelOrderAndRefund: async (id) => {
@@ -315,6 +329,16 @@ const OrderService = {
 
         const refundAmount = order.amount - (order.profit || 0);
         await UserService.updateBalance(order.user_id, refundAmount, 'credit', `Hoàn tiền đơn hàng #${id}`);
+
+        // Send email notification (non-blocking)
+        if (order && order.user_email) {
+            try {
+                await sendOrderFailureEmail(order.user_email, order, "Đơn hàng đã bị hủy và hoàn tiền");
+            } catch (emailError) {
+                console.error('❌ Failed to send order failure email:', emailError);
+                // Don't throw - we don't want email failures to fail the refund process
+            }
+        }
 
         return { message: "Cancelled and refunded" };
     },

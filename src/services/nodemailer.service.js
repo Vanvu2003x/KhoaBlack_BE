@@ -995,6 +995,307 @@ async function sendRolePromotionOTP(email, otp, targetUserEmail, newRole) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+//                          🎉 SEND ORDER SUCCESS - ĐƠN HÀNG THÀNH CÔNG
+// ═══════════════════════════════════════════════════════════════════════════════
+async function sendOrderSuccessEmail(email, orderData) {
+    try {
+        const formattedPrice = new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND'
+        }).format(orderData.amount || 0);
+
+        const orderDate = new Date(orderData.created_at || orderData.create_at).toLocaleString('vi-VN', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        const content = `
+            <!-- Success Icon -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="text-align: center; margin-bottom: 30px;">
+                <tr>
+                    <td>
+                        <div style="width: 100px; height: 100px; background: ${THEME.successBg}; border-radius: 50%; display: inline-block; line-height: 100px; font-size: 50px; margin-bottom: 20px; border: 3px solid ${THEME.success}; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);">
+                            🎉
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <h2 style="margin: 0 0 10px 0; color: ${THEME.success}; font-size: 28px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">
+                            Đơn Hàng Thành Công
+                        </h2>
+                        <p style="margin: 0; color: ${THEME.textSecondary}; font-size: 15px;">
+                            Giao dịch của bạn đã được xử lý thành công!
+                        </p>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Order Details Card -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: ${THEME.bgCard}; border-radius: 16px; border: 1px solid ${THEME.borderAccent}; overflow: hidden; margin-bottom: 25px;">
+                <tr>
+                    <td style="padding: 25px;">
+                        <!-- Order ID -->
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 15px;">
+                            <tr>
+                                <td style="color: ${THEME.textMuted}; font-size: 14px;">Mã đơn hàng</td>
+                                <td align="right" style="color: ${THEME.primary}; font-size: 16px; font-weight: 700;">#${orderData.id}</td>
+                            </tr>
+                        </table>
+                        <!-- Divider -->
+                        <div style="border-top: 1px dashed ${THEME.borderSubtle}; margin: 15px 0;"></div>
+                        <!-- Package Name -->
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 15px;">
+                            <tr>
+                                <td style="color: ${THEME.textMuted}; font-size: 14px;">Gói nạp</td>
+                                <td align="right" style="color: ${THEME.textPrimary}; font-size: 14px; font-weight: 600;">${orderData.package_name || 'N/A'}</td>
+                            </tr>
+                        </table>
+                        <!-- Game Name -->
+                        ${orderData.game_name ? `
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 15px;">
+                            <tr>
+                                <td style="color: ${THEME.textMuted}; font-size: 14px;">Game</td>
+                                <td align="right" style="color: ${THEME.textPrimary}; font-size: 14px; font-weight: 600;">${orderData.game_name}</td>
+                            </tr>
+                        </table>
+                        ` : ''}
+                        <!-- Divider -->
+                        <div style="border-top: 1px dashed ${THEME.borderSubtle}; margin: 15px 0;"></div>
+                        <!-- Amount -->
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                                <td style="color: ${THEME.textMuted}; font-size: 14px;">Số tiền giao dịch</td>
+                                <td align="right" style="color: ${THEME.success}; font-size: 18px; font-weight: 700;">${formattedPrice}</td>
+                            </tr>
+                        </table>
+                        <!-- Order Date -->
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 15px;">
+                            <tr>
+                                <td style="color: ${THEME.textMuted}; font-size: 13px;">Thời gian</td>
+                                <td align="right" style="color: ${THEME.textSecondary}; font-size: 13px;">${orderDate}</td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Success Message -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: ${THEME.successBg}; border-left: 4px solid ${THEME.success}; border-radius: 8px; padding: 15px 18px; margin-bottom: 25px;">
+                <tr>
+                    <td>
+                        <p style="margin: 0; color: ${THEME.success}; font-size: 14px; line-height: 1.6;">
+                            <strong>✓ Hoàn tất:</strong> Đơn hàng của bạn đã được xử lý thành công. Cảm ơn bạn đã tin tưởng sử dụng dịch vụ!
+                        </p>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- CTA Button -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                    <td align="center">
+                        <a href="https://napgameuytin.vn/user/history" style="display: inline-block; background: ${THEME.gradientSuccess}; color: #FFFFFF; padding: 16px 40px; border-radius: 50px; text-decoration: none; font-weight: 600; font-size: 14px; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);">
+                            📋 Xem lịch sử đơn hàng
+                        </a>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Support Note -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 25px;">
+                <tr>
+                    <td align="center">
+                        <p style="margin: 0; color: ${THEME.textMuted}; font-size: 13px;">
+                            Cần hỗ trợ? <a href="https://napgameuytin.vn/support" style="color: ${THEME.primary}; text-decoration: none;">Chat ngay</a> với chúng tôi!
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        `;
+
+        const html = baseTemplate({
+            title: "Đơn Hàng Thành Công",
+            subtitle: `Đơn hàng #${orderData.id} đã hoàn tất`,
+            content,
+            headerGradient: THEME.gradientSuccess,
+            headerIcon: "✅"
+        });
+
+        const info = await transporter.sendMail({
+            from: '"Napgameuytin" <napgameuytin2111@gmail.com>',
+            to: email,
+            subject: `🎉 Đơn hàng #${orderData.id} thành công!`,
+            html,
+            attachments: [logoAttachment]
+        });
+
+        console.log("✅ Order success email sent:", info.messageId);
+        return info;
+    } catch (error) {
+        console.error("❌ Send Order Success Email Error:", error);
+        throw error;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//                          ❌ SEND ORDER FAILURE - ĐƠN HÀNG THẤT BẠI
+// ═══════════════════════════════════════════════════════════════════════════════
+async function sendOrderFailureEmail(email, orderData, reason = "Đơn hàng đã bị hủy") {
+    try {
+        const formattedPrice = new Intl.NumberFormat('vi-VN', {
+            style: 'currency',
+            currency: 'VND'
+        }).format(orderData.amount || 0);
+
+        const orderDate = new Date(orderData.created_at || orderData.create_at).toLocaleString('vi-VN', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        const content = `
+            <!-- Failure Icon -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="text-align: center; margin-bottom: 30px;">
+                <tr>
+                    <td>
+                        <div style="width: 100px; height: 100px; background: ${THEME.errorBg}; border-radius: 50%; display: inline-block; line-height: 100px; font-size: 50px; margin-bottom: 20px; border: 3px solid ${THEME.error}; box-shadow: 0 10px 30px rgba(239, 68, 68, 0.3);">
+                            ⚠️
+                        </div>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <h2 style="margin: 0 0 10px 0; color: ${THEME.error}; font-size: 28px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">
+                            Đơn Hàng Đã Hủy
+                        </h2>
+                        <p style="margin: 0; color: ${THEME.textSecondary}; font-size: 15px;">
+                            ${reason}
+                        </p>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Order Details Card -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: ${THEME.bgCard}; border-radius: 16px; border: 1px solid ${THEME.borderAccent}; overflow: hidden; margin-bottom: 25px;">
+                <tr>
+                    <td style="padding: 25px;">
+                        <!-- Order ID -->
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 15px;">
+                            <tr>
+                                <td style="color: ${THEME.textMuted}; font-size: 14px;">Mã đơn hàng</td>
+                                <td align="right" style="color: ${THEME.error}; font-size: 16px; font-weight: 700;">#${orderData.id}</td>
+                            </tr>
+                        </table>
+                        <!-- Divider -->
+                        <div style="border-top: 1px dashed ${THEME.borderSubtle}; margin: 15px 0;"></div>
+                        <!-- Package Name -->
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 15px;">
+                            <tr>
+                                <td style="color: ${THEME.textMuted}; font-size: 14px;">Gói nạp</td>
+                                <td align="right" style="color: ${THEME.textPrimary}; font-size: 14px; font-weight: 600;">${orderData.package_name || 'N/A'}</td>
+                            </tr>
+                        </table>
+                        <!-- Game Name -->
+                        ${orderData.game_name ? `
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 15px;">
+                            <tr>
+                                <td style="color: ${THEME.textMuted}; font-size: 14px;">Game</td>
+                                <td align="right" style="color: ${THEME.textPrimary}; font-size: 14px; font-weight: 600;">${orderData.game_name}</td>
+                            </tr>
+                        </table>
+                        ` : ''}
+                        <!-- Divider -->
+                        <div style="border-top: 1px dashed ${THEME.borderSubtle}; margin: 15px 0;"></div>
+                        <!-- Refund Amount -->
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                            <tr>
+                                <td style="color: ${THEME.textMuted}; font-size: 14px;">Số tiền hoàn lại</td>
+                                <td align="right" style="color: ${THEME.warning}; font-size: 18px; font-weight: 700;">${formattedPrice}</td>
+                            </tr>
+                        </table>
+                        <!-- Order Date -->
+                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 15px;">
+                            <tr>
+                                <td style="color: ${THEME.textMuted}; font-size: 13px;">Thời gian</td>
+                                <td align="right" style="color: ${THEME.textSecondary}; font-size: 13px;">${orderDate}</td>
+                            </tr>
+                        </table>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Refund Notice -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: ${THEME.warningBg}; border-left: 4px solid ${THEME.warning}; border-radius: 8px; padding: 15px 18px; margin-bottom: 25px;">
+                <tr>
+                    <td>
+                        <p style="margin: 0; color: ${THEME.warning}; font-size: 14px; line-height: 1.6;">
+                            <strong>💰 Hoàn tiền:</strong> Số tiền ${formattedPrice} đã được hoàn lại vào tài khoản của bạn.
+                        </p>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- CTA Buttons -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                    <td align="center" style="padding-bottom: 15px;">
+                        <a href="https://napgameuytin.vn/user/history" style="display: inline-block; background: ${THEME.gradientPrimary}; color: #FFFFFF; padding: 16px 40px; border-radius: 50px; text-decoration: none; font-weight: 600; font-size: 14px; box-shadow: 0 8px 20px ${THEME.primaryGlow}; margin: 0 5px;">
+                            📋 Xem lịch sử
+                        </a>
+                    </td>
+                </tr>
+                <tr>
+                    <td align="center">
+                        <a href="https://napgameuytin.vn/support" style="display: inline-block; background: ${THEME.bgCard}; border: 2px solid ${THEME.primary}; color: ${THEME.primary}; padding: 14px 38px; border-radius: 50px; text-decoration: none; font-weight: 600; font-size: 14px; margin: 0 5px;">
+                            💬 Liên hệ hỗ trợ
+                        </a>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Support Note -->
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 25px;">
+                <tr>
+                    <td align="center">
+                        <p style="margin: 0; color: ${THEME.textMuted}; font-size: 13px;">
+                            Nếu bạn cần hỗ trợ, đừng ngần ngại <a href="https://napgameuytin.vn/support" style="color: ${THEME.primary}; text-decoration: none;">liên hệ với chúng tôi</a>!
+                        </p>
+                    </td>
+                </tr>
+            </table>
+        `;
+
+        const html = baseTemplate({
+            title: "Đơn Hàng Đã Hủy",
+            subtitle: `Đơn hàng #${orderData.id} đã bị hủy`,
+            content,
+            headerGradient: THEME.gradientDanger,
+            headerIcon: "❌"
+        });
+
+        const info = await transporter.sendMail({
+            from: '"Napgameuytin Support" <napgameuytin2111@gmail.com>',
+            to: email,
+            subject: `⚠️ Đơn hàng #${orderData.id} đã bị hủy`,
+            html,
+            attachments: [logoAttachment]
+        });
+
+        console.log("✅ Order failure email sent:", info.messageId);
+        return info;
+    } catch (error) {
+        console.error("❌ Send Order Failure Email Error:", error);
+        throw error;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 //                              �📦 EXPORTS
 // ═══════════════════════════════════════════════════════════════════════════════
 module.exports = {
@@ -1003,5 +1304,7 @@ module.exports = {
     sendAcc,
     sendStatus,
     sendAdminBalanceOTP,
-    sendRolePromotionOTP
+    sendRolePromotionOTP,
+    sendOrderSuccessEmail,
+    sendOrderFailureEmail
 };
