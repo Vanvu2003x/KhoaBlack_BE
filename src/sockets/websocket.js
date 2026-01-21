@@ -58,6 +58,10 @@ function initSocket(io) {
   });
 }
 
+function getIO() {
+  return _io;
+}
+
 function emitToUser(userId, event, data) {
   if (!_io) return;
   for (const [socketId, userData] of userSocketMap.entries()) {
