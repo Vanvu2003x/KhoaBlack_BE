@@ -289,7 +289,25 @@ const OrderService = {
         };
     },
 
-    updateOrderStatus: async (id, status) => {
+    acceptOrder: async (id, adminId) => {
+        // Check if order exists
+        const [order] = await db.select().from(orders).where(eq(orders.id, id));
+        if (!order) throw { status: 404, message: 'Đơn hàng không tồn tại' };
+
+        // Update status and admin handler
+        await db.update(orders)
+            .set({
+                status: 'processing',
+                user_id_nap: adminId,
+                updated_at: new Date()
+            })
+            .where(eq(orders.id, id));
+
+        // Return updated order
+        return await OrderService.getOrderById(id);
+    },
+
+    changeOrderStatus: async (id, status) => {
         await db.update(orders)
             .set({ status: status, updated_at: new Date() })
             .where(eq(orders.id, id));
@@ -314,7 +332,7 @@ const OrderService = {
     },
 
     completeOrder: async (id) => {
-        const updatedOrder = await OrderService.updateOrderStatus(id, "success");
+        const updatedOrder = await OrderService.changeOrderStatus(id, "success");
 
         // Send socket notification (real-time)
         try {
@@ -348,7 +366,7 @@ const OrderService = {
 
         await db.update(orders).set({ status: 'cancelled', updated_at: new Date() }).where(eq(orders.id, id));
 
-        const refundAmount = order.amount - (order.profit || 0);
+        const refundAmount = Number(order.amount);
         await UserService.updateBalance(order.user_id, refundAmount, 'credit', `Hoàn tiền đơn hàng #${id}`);
 
         // Send socket notification (real-time)
