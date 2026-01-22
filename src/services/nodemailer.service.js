@@ -1005,6 +1005,7 @@ async function sendOrderSuccessEmail(email, orderData) {
         }).format(orderData.amount || 0);
 
         const orderDate = new Date(orderData.created_at || orderData.create_at).toLocaleString('vi-VN', {
+            weekday: 'long',
             day: '2-digit',
             month: '2-digit',
             year: 'numeric',
@@ -1012,123 +1013,194 @@ async function sendOrderSuccessEmail(email, orderData) {
             minute: '2-digit'
         });
 
-        const content = `
-            <!-- Success Icon -->
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="text-align: center; margin-bottom: 30px;">
-                <tr>
-                    <td>
-                        <div style="width: 100px; height: 100px; background: ${THEME.successBg}; border-radius: 50%; display: inline-block; line-height: 100px; font-size: 50px; margin-bottom: 20px; border: 3px solid ${THEME.success}; box-shadow: 0 10px 30px rgba(16, 185, 129, 0.3);">
-                            🎉
-                        </div>
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        <h2 style="margin: 0 0 10px 0; color: ${THEME.success}; font-size: 28px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">
-                            Đơn Hàng Thành Công
-                        </h2>
-                        <p style="margin: 0; color: ${THEME.textSecondary}; font-size: 15px;">
-                            Giao dịch của bạn đã được xử lý thành công!
-                        </p>
-                    </td>
-                </tr>
-            </table>
+        // Parse account info if available
+        let accountInfo = {};
+        try {
+            if (orderData.account_info) {
+                accountInfo = typeof orderData.account_info === 'string'
+                    ? JSON.parse(orderData.account_info)
+                    : orderData.account_info;
+            }
+        } catch (e) {
+            accountInfo = {};
+        }
 
-            <!-- Order Details Card -->
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: ${THEME.bgCard}; border-radius: 16px; border: 1px solid ${THEME.borderAccent}; overflow: hidden; margin-bottom: 25px;">
-                <tr>
-                    <td style="padding: 25px;">
-                        <!-- Order ID -->
-                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 15px;">
-                            <tr>
-                                <td style="color: ${THEME.textMuted}; font-size: 14px;">Mã đơn hàng</td>
-                                <td align="right" style="color: ${THEME.primary}; font-size: 16px; font-weight: 700;">#${orderData.id}</td>
-                            </tr>
-                        </table>
-                        <!-- Divider -->
-                        <div style="border-top: 1px dashed ${THEME.borderSubtle}; margin: 15px 0;"></div>
-                        <!-- Package Name -->
-                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 15px;">
-                            <tr>
-                                <td style="color: ${THEME.textMuted}; font-size: 14px;">Gói nạp</td>
-                                <td align="right" style="color: ${THEME.textPrimary}; font-size: 14px; font-weight: 600;">${orderData.package_name || 'N/A'}</td>
-                            </tr>
-                        </table>
-                        <!-- Game Name -->
-                        ${orderData.game_name ? `
-                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 15px;">
-                            <tr>
-                                <td style="color: ${THEME.textMuted}; font-size: 14px;">Game</td>
-                                <td align="right" style="color: ${THEME.textPrimary}; font-size: 14px; font-weight: 600;">${orderData.game_name}</td>
-                            </tr>
-                        </table>
-                        ` : ''}
-                        <!-- Divider -->
-                        <div style="border-top: 1px dashed ${THEME.borderSubtle}; margin: 15px 0;"></div>
-                        <!-- Amount -->
-                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                            <tr>
-                                <td style="color: ${THEME.textMuted}; font-size: 14px;">Số tiền giao dịch</td>
-                                <td align="right" style="color: ${THEME.success}; font-size: 18px; font-weight: 700;">${formattedPrice}</td>
-                            </tr>
-                        </table>
-                        <!-- Order Date -->
-                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 15px;">
-                            <tr>
-                                <td style="color: ${THEME.textMuted}; font-size: 13px;">Thời gian</td>
-                                <td align="right" style="color: ${THEME.textSecondary}; font-size: 13px;">${orderDate}</td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-            </table>
+        const html = `
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đơn Hàng Thành Công - #${orderData.id}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #030712; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;">
+    
+    <!-- Email Wrapper -->
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(180deg, #030712 0%, #0f172a 100%);">
+        <tr>
+            <td align="center" style="padding: 40px 15px;">
+                
+                <!-- Main Container -->
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; background: linear-gradient(145deg, #0f172a 0%, #1e293b 100%); border-radius: 24px; overflow: hidden; border: 1px solid rgba(34, 197, 94, 0.3); box-shadow: 0 0 60px rgba(34, 197, 94, 0.15), 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+                    
+                    <!-- SUCCESS HEADER with Animation-like Design -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #059669 0%, #10b981 50%, #34d399 100%); padding: 50px 40px; text-align: center; position: relative;">
+                            <!-- Decorative circles -->
+                            <div style="position: absolute; top: -20px; right: -20px; width: 100px; height: 100px; background: rgba(255,255,255,0.1); border-radius: 50%;"></div>
+                            <div style="position: absolute; bottom: -30px; left: -30px; width: 80px; height: 80px; background: rgba(255,255,255,0.05); border-radius: 50%;"></div>
+                            
+                            <!-- Success Icon -->
+                            <div style="width: 90px; height: 90px; background: rgba(255,255,255,0.2); border-radius: 50%; display: inline-block; line-height: 90px; font-size: 45px; margin-bottom: 20px; border: 3px solid rgba(255,255,255,0.4); box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+                                ✅
+                            </div>
+                            <h1 style="margin: 0; color: #FFFFFF; font-size: 28px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 2px 10px rgba(0,0,0,0.3);">
+                                GIAO DỊCH THÀNH CÔNG
+                            </h1>
+                            <p style="margin: 12px 0 0 0; color: rgba(255,255,255,0.9); font-size: 16px; font-weight: 500;">
+                                Đơn hàng #${orderData.id} đã hoàn tất
+                            </p>
+                        </td>
+                    </tr>
 
-            <!-- Success Message -->
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: ${THEME.successBg}; border-left: 4px solid ${THEME.success}; border-radius: 8px; padding: 15px 18px; margin-bottom: 25px;">
-                <tr>
-                    <td>
-                        <p style="margin: 0; color: ${THEME.success}; font-size: 14px; line-height: 1.6;">
-                            <strong>✓ Hoàn tất:</strong> Đơn hàng của bạn đã được xử lý thành công. Cảm ơn bạn đã tin tưởng sử dụng dịch vụ!
-                        </p>
-                    </td>
-                </tr>
-            </table>
+                    <!-- ORDER RECEIPT CARD -->
+                    <tr>
+                        <td style="padding: 40px 35px;">
+                            
+                            <!-- Greeting -->
+                            <p style="margin: 0 0 25px 0; color: #e2e8f0; font-size: 16px; line-height: 1.7;">
+                                Xin chào <strong style="color: #34d399;">${orderData.user_name || 'Quý khách'}</strong>,<br>
+                                Cảm ơn bạn đã tin tưởng sử dụng dịch vụ tại <strong style="color: #ffffff;">Napgameuytin</strong>! 🎮
+                            </p>
 
-            <!-- CTA Button -->
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                <tr>
-                    <td align="center">
-                        <a href="https://napgameuytin.vn/user/history" style="display: inline-block; background: ${THEME.gradientSuccess}; color: #FFFFFF; padding: 16px 40px; border-radius: 50px; text-decoration: none; font-weight: 600; font-size: 14px; box-shadow: 0 8px 20px rgba(16, 185, 129, 0.3);">
-                            📋 Xem lịch sử đơn hàng
-                        </a>
-                    </td>
-                </tr>
-            </table>
+                            <!-- Receipt Card -->
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(145deg, #1e293b 0%, #0f172a 100%); border-radius: 16px; border: 1px solid #334155; overflow: hidden; margin-bottom: 25px;">
+                                <!-- Receipt Header -->
+                                <tr>
+                                    <td style="background: linear-gradient(90deg, #059669 0%, #10b981 100%); padding: 15px 25px;">
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td style="color: #ffffff; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+                                                    📋 Chi tiết đơn hàng
+                                                </td>
+                                                <td align="right" style="color: rgba(255,255,255,0.9); font-size: 13px;">
+                                                    #${orderData.id}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Receipt Body -->
+                                <tr>
+                                    <td style="padding: 25px;">
+                                        <!-- Game & Package -->
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 20px;">
+                                            <tr>
+                                                <td style="color: #94a3b8; font-size: 13px; padding-bottom: 8px;">🎮 Game</td>
+                                                <td align="right" style="color: #f1f5f9; font-size: 15px; font-weight: 600; padding-bottom: 8px;">${orderData.game_name || 'N/A'}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #94a3b8; font-size: 13px; padding-bottom: 8px;">📦 Gói nạp</td>
+                                                <td align="right" style="color: #f1f5f9; font-size: 15px; font-weight: 600; padding-bottom: 8px;">${orderData.package_name || 'N/A'}</td>
+                                            </tr>
+                                            ${accountInfo.uid ? `
+                                            <tr>
+                                                <td style="color: #94a3b8; font-size: 13px; padding-bottom: 8px;">👤 UID</td>
+                                                <td align="right" style="color: #fbbf24; font-size: 15px; font-weight: 600; padding-bottom: 8px;">${accountInfo.uid}</td>
+                                            </tr>
+                                            ` : ''}
+                                            ${accountInfo.server ? `
+                                            <tr>
+                                                <td style="color: #94a3b8; font-size: 13px; padding-bottom: 8px;">🌐 Server</td>
+                                                <td align="right" style="color: #f1f5f9; font-size: 15px; font-weight: 600; padding-bottom: 8px;">${accountInfo.server}</td>
+                                            </tr>
+                                            ` : ''}
+                                        </table>
+                                        
+                                        <!-- Divider -->
+                                        <div style="border-top: 1px dashed #334155; margin: 20px 0;"></div>
+                                        
+                                        <!-- Total Amount -->
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td style="color: #94a3b8; font-size: 14px;">💰 Tổng thanh toán</td>
+                                                <td align="right" style="color: #34d399; font-size: 24px; font-weight: 800;">${formattedPrice}</td>
+                                            </tr>
+                                        </table>
+                                        
+                                        <!-- Time -->
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 15px;">
+                                            <tr>
+                                                <td style="color: #64748b; font-size: 12px;">🕐 ${orderDate}</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
 
-            <!-- Support Note -->
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 25px;">
-                <tr>
-                    <td align="center">
-                        <p style="margin: 0; color: ${THEME.textMuted}; font-size: 13px;">
-                            Cần hỗ trợ? <a href="https://napgameuytin.vn/support" style="color: ${THEME.primary}; text-decoration: none;">Chat ngay</a> với chúng tôi!
-                        </p>
-                    </td>
-                </tr>
-            </table>
-        `;
+                            <!-- Status Timeline -->
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: rgba(34, 197, 94, 0.1); border-left: 4px solid #10b981; border-radius: 8px; padding: 18px 20px; margin-bottom: 25px;">
+                                <tr>
+                                    <td>
+                                        <p style="margin: 0; color: #34d399; font-size: 14px; font-weight: 600;">
+                                            ✓ Đã xác nhận thanh toán
+                                        </p>
+                                        <p style="margin: 5px 0 0 0; color: #94a3b8; font-size: 13px;">
+                                            Đơn hàng của bạn đã được xử lý thành công và hoàn tất!
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
 
-        const html = baseTemplate({
-            title: "Đơn Hàng Thành Công",
-            subtitle: `Đơn hàng #${orderData.id} đã hoàn tất`,
-            content,
-            headerGradient: THEME.gradientSuccess,
-            headerIcon: "✅"
-        });
+                            <!-- CTA Button -->
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td align="center">
+                                        <a href="https://napgameuytin.vn/account?tab=order-history" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #FFFFFF; padding: 18px 45px; border-radius: 50px; text-decoration: none; font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4);">
+                                            📋 Xem lịch sử đơn hàng
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- FOOTER -->
+                    <tr>
+                        <td style="background: #0f172a; padding: 30px; border-top: 1px solid #1e293b;">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td align="center" style="padding-bottom: 15px;">
+                                        <img src="cid:logo" alt="Napgameuytin" style="height: 35px; border-radius: 8px; opacity: 0.9;">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center">
+                                        <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.8;">
+                                            Cần hỗ trợ? <a href="https://napgameuytin.vn/support" style="color: #10b981; text-decoration: none;">Liên hệ ngay</a><br>
+                                            © 2026 Napgameuytin.vn - Nạp game uy tín hàng đầu Việt Nam
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                </table>
+                
+            </td>
+        </tr>
+    </table>
+
+</body>
+</html>
+        `.trim();
 
         const info = await transporter.sendMail({
             from: '"Napgameuytin" <napgameuytin2111@gmail.com>',
             to: email,
-            subject: `🎉 Đơn hàng #${orderData.id} thành công!`,
+            subject: `🎉 Đơn hàng #${orderData.id} thành công! - ${orderData.package_name || 'Nạp game'}`,
             html,
             attachments: [logoAttachment]
         });
@@ -1141,6 +1213,7 @@ async function sendOrderSuccessEmail(email, orderData) {
     }
 }
 
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //                          ❌ SEND ORDER FAILURE - ĐƠN HÀNG THẤT BẠI
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1152,6 +1225,7 @@ async function sendOrderFailureEmail(email, orderData, reason = "Đơn hàng đ�
         }).format(orderData.amount || 0);
 
         const orderDate = new Date(orderData.created_at || orderData.create_at).toLocaleString('vi-VN', {
+            weekday: 'long',
             day: '2-digit',
             month: '2-digit',
             year: 'numeric',
@@ -1159,130 +1233,206 @@ async function sendOrderFailureEmail(email, orderData, reason = "Đơn hàng đ�
             minute: '2-digit'
         });
 
-        const content = `
-            <!-- Failure Icon -->
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="text-align: center; margin-bottom: 30px;">
-                <tr>
-                    <td>
-                        <div style="width: 100px; height: 100px; background: ${THEME.errorBg}; border-radius: 50%; display: inline-block; line-height: 100px; font-size: 50px; margin-bottom: 20px; border: 3px solid ${THEME.error}; box-shadow: 0 10px 30px rgba(239, 68, 68, 0.3);">
-                            ⚠️
-                        </div>
-                    </td>
-                </tr>
-                <tr>
-                    <td>
-                        <h2 style="margin: 0 0 10px 0; color: ${THEME.error}; font-size: 28px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">
-                            Đơn Hàng Đã Hủy
-                        </h2>
-                        <p style="margin: 0; color: ${THEME.textSecondary}; font-size: 15px;">
-                            ${reason}
-                        </p>
-                    </td>
-                </tr>
-            </table>
+        const html = `
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Đơn Hàng Đã Hủy - #${orderData.id}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #030712; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;">
+    
+    <!-- Email Wrapper -->
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(180deg, #030712 0%, #1c1917 100%);">
+        <tr>
+            <td align="center" style="padding: 40px 15px;">
+                
+                <!-- Main Container -->
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; background: linear-gradient(145deg, #1c1917 0%, #292524 100%); border-radius: 24px; overflow: hidden; border: 1px solid rgba(239, 68, 68, 0.3); box-shadow: 0 0 60px rgba(239, 68, 68, 0.1), 0 25px 50px -12px rgba(0, 0, 0, 0.5);">
+                    
+                    <!-- CANCEL HEADER -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #b91c1c 0%, #dc2626 50%, #ef4444 100%); padding: 50px 40px; text-align: center; position: relative;">
+                            <!-- Decorative -->
+                            <div style="position: absolute; top: -15px; right: -15px; width: 80px; height: 80px; background: rgba(255,255,255,0.08); border-radius: 50%;"></div>
+                            
+                            <!-- Cancel Icon -->
+                            <div style="width: 90px; height: 90px; background: rgba(255,255,255,0.15); border-radius: 50%; display: inline-block; line-height: 90px; font-size: 45px; margin-bottom: 20px; border: 3px solid rgba(255,255,255,0.3); box-shadow: 0 10px 30px rgba(0,0,0,0.3);">
+                                ⚠️
+                            </div>
+                            <h1 style="margin: 0; color: #FFFFFF; font-size: 26px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 2px 10px rgba(0,0,0,0.3);">
+                                ĐƠN HÀNG ĐÃ HỦY
+                            </h1>
+                            <p style="margin: 12px 0 0 0; color: rgba(255,255,255,0.9); font-size: 15px; font-weight: 500;">
+                                Đơn hàng #${orderData.id} đã bị hủy
+                            </p>
+                        </td>
+                    </tr>
 
-            <!-- Order Details Card -->
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: ${THEME.bgCard}; border-radius: 16px; border: 1px solid ${THEME.borderAccent}; overflow: hidden; margin-bottom: 25px;">
-                <tr>
-                    <td style="padding: 25px;">
-                        <!-- Order ID -->
-                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 15px;">
-                            <tr>
-                                <td style="color: ${THEME.textMuted}; font-size: 14px;">Mã đơn hàng</td>
-                                <td align="right" style="color: ${THEME.error}; font-size: 16px; font-weight: 700;">#${orderData.id}</td>
-                            </tr>
-                        </table>
-                        <!-- Divider -->
-                        <div style="border-top: 1px dashed ${THEME.borderSubtle}; margin: 15px 0;"></div>
-                        <!-- Package Name -->
-                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 15px;">
-                            <tr>
-                                <td style="color: ${THEME.textMuted}; font-size: 14px;">Gói nạp</td>
-                                <td align="right" style="color: ${THEME.textPrimary}; font-size: 14px; font-weight: 600;">${orderData.package_name || 'N/A'}</td>
-                            </tr>
-                        </table>
-                        <!-- Game Name -->
-                        ${orderData.game_name ? `
-                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 15px;">
-                            <tr>
-                                <td style="color: ${THEME.textMuted}; font-size: 14px;">Game</td>
-                                <td align="right" style="color: ${THEME.textPrimary}; font-size: 14px; font-weight: 600;">${orderData.game_name}</td>
-                            </tr>
-                        </table>
-                        ` : ''}
-                        <!-- Divider -->
-                        <div style="border-top: 1px dashed ${THEME.borderSubtle}; margin: 15px 0;"></div>
-                        <!-- Refund Amount -->
-                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                            <tr>
-                                <td style="color: ${THEME.textMuted}; font-size: 14px;">Số tiền hoàn lại</td>
-                                <td align="right" style="color: ${THEME.warning}; font-size: 18px; font-weight: 700;">${formattedPrice}</td>
-                            </tr>
-                        </table>
-                        <!-- Order Date -->
-                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 15px;">
-                            <tr>
-                                <td style="color: ${THEME.textMuted}; font-size: 13px;">Thời gian</td>
-                                <td align="right" style="color: ${THEME.textSecondary}; font-size: 13px;">${orderDate}</td>
-                            </tr>
-                        </table>
-                    </td>
-                </tr>
-            </table>
+                    <!-- ORDER DETAILS -->
+                    <tr>
+                        <td style="padding: 40px 35px;">
+                            
+                            <!-- Greeting -->
+                            <p style="margin: 0 0 25px 0; color: #d6d3d1; font-size: 16px; line-height: 1.7;">
+                                Xin chào <strong style="color: #fbbf24;">${orderData.user_name || 'Quý khách'}</strong>,<br>
+                                Chúng tôi rất tiếc phải thông báo rằng đơn hàng của bạn đã bị hủy.
+                            </p>
 
-            <!-- Refund Notice -->
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: ${THEME.warningBg}; border-left: 4px solid ${THEME.warning}; border-radius: 8px; padding: 15px 18px; margin-bottom: 25px;">
-                <tr>
-                    <td>
-                        <p style="margin: 0; color: ${THEME.warning}; font-size: 14px; line-height: 1.6;">
-                            <strong>💰 Hoàn tiền:</strong> Số tiền ${formattedPrice} đã được hoàn lại vào tài khoản của bạn.
-                        </p>
-                    </td>
-                </tr>
-            </table>
+                            <!-- Reason Card -->
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: rgba(239, 68, 68, 0.1); border-left: 4px solid #ef4444; border-radius: 8px; padding: 18px 20px; margin-bottom: 25px;">
+                                <tr>
+                                    <td>
+                                        <p style="margin: 0; color: #fca5a5; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">
+                                            📋 Lý do hủy đơn
+                                        </p>
+                                        <p style="margin: 8px 0 0 0; color: #fef2f2; font-size: 15px; line-height: 1.6;">
+                                            ${reason}
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
 
-            <!-- CTA Buttons -->
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
-                <tr>
-                    <td align="center" style="padding-bottom: 15px;">
-                        <a href="https://napgameuytin.vn/user/history" style="display: inline-block; background: ${THEME.gradientPrimary}; color: #FFFFFF; padding: 16px 40px; border-radius: 50px; text-decoration: none; font-weight: 600; font-size: 14px; box-shadow: 0 8px 20px ${THEME.primaryGlow}; margin: 0 5px;">
-                            📋 Xem lịch sử
-                        </a>
-                    </td>
-                </tr>
-                <tr>
-                    <td align="center">
-                        <a href="https://napgameuytin.vn/support" style="display: inline-block; background: ${THEME.bgCard}; border: 2px solid ${THEME.primary}; color: ${THEME.primary}; padding: 14px 38px; border-radius: 50px; text-decoration: none; font-weight: 600; font-size: 14px; margin: 0 5px;">
-                            💬 Liên hệ hỗ trợ
-                        </a>
-                    </td>
-                </tr>
-            </table>
+                            <!-- Order Details Card -->
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(145deg, #292524 0%, #1c1917 100%); border-radius: 16px; border: 1px solid #44403c; overflow: hidden; margin-bottom: 25px;">
+                                <!-- Header -->
+                                <tr>
+                                    <td style="background: linear-gradient(90deg, #78350f 0%, #92400e 100%); padding: 15px 25px;">
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td style="color: #fef3c7; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+                                                    📄 Chi tiết đơn hàng
+                                                </td>
+                                                <td align="right" style="color: rgba(254,243,199,0.8); font-size: 13px;">
+                                                    #${orderData.id}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Body -->
+                                <tr>
+                                    <td style="padding: 25px;">
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 20px;">
+                                            <tr>
+                                                <td style="color: #a8a29e; font-size: 13px; padding-bottom: 8px;">🎮 Game</td>
+                                                <td align="right" style="color: #e7e5e4; font-size: 15px; font-weight: 600; padding-bottom: 8px;">${orderData.game_name || 'N/A'}</td>
+                                            </tr>
+                                            <tr>
+                                                <td style="color: #a8a29e; font-size: 13px; padding-bottom: 8px;">📦 Gói nạp</td>
+                                                <td align="right" style="color: #e7e5e4; font-size: 15px; font-weight: 600; padding-bottom: 8px;">${orderData.package_name || 'N/A'}</td>
+                                            </tr>
+                                        </table>
+                                        
+                                        <div style="border-top: 1px dashed #44403c; margin: 20px 0;"></div>
+                                        
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                            <tr>
+                                                <td style="color: #a8a29e; font-size: 14px;">💰 Số tiền đơn hàng</td>
+                                                <td align="right" style="color: #fbbf24; font-size: 22px; font-weight: 800;">${formattedPrice}</td>
+                                            </tr>
+                                        </table>
+                                        
+                                        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 15px;">
+                                            <tr>
+                                                <td style="color: #78716c; font-size: 12px;">🕐 ${orderDate}</td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
 
-            <!-- Support Note -->
-            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-top: 25px;">
-                <tr>
-                    <td align="center">
-                        <p style="margin: 0; color: ${THEME.textMuted}; font-size: 13px;">
-                            Nếu bạn cần hỗ trợ, đừng ngần ngại <a href="https://napgameuytin.vn/support" style="color: ${THEME.primary}; text-decoration: none;">liên hệ với chúng tôi</a>!
-                        </p>
-                    </td>
-                </tr>
-            </table>
-        `;
+                            <!-- Refund Notice -->
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background: linear-gradient(135deg, rgba(34, 197, 94, 0.15) 0%, rgba(16, 185, 129, 0.1) 100%); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 16px; padding: 25px; margin-bottom: 25px;">
+                                <tr>
+                                    <td align="center">
+                                        <div style="font-size: 40px; margin-bottom: 15px;">💰</div>
+                                        <p style="margin: 0 0 8px 0; color: #34d399; font-size: 16px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+                                            Hoàn tiền thành công
+                                        </p>
+                                        <p style="margin: 0 0 15px 0; color: #86efac; font-size: 28px; font-weight: 800;">
+                                            ${formattedPrice}
+                                        </p>
+                                        <p style="margin: 0; color: #a7f3d0; font-size: 13px; line-height: 1.6;">
+                                            ✓ Số tiền trên đã được hoàn vào số dư tài khoản của bạn
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
 
-        const html = baseTemplate({
-            title: "Đơn Hàng Đã Hủy",
-            subtitle: `Đơn hàng #${orderData.id} đã bị hủy`,
-            content,
-            headerGradient: THEME.gradientDanger,
-            headerIcon: "❌"
-        });
+                            <!-- CTA Buttons -->
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td align="center" style="padding-bottom: 12px;">
+                                        <a href="https://napgameuytin.vn/account?tab=order-history" style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #FFFFFF; padding: 16px 40px; border-radius: 50px; text-decoration: none; font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 10px 25px rgba(245, 158, 11, 0.3);">
+                                            📋 Xem lịch sử
+                                        </a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center">
+                                        <a href="https://napgameuytin.vn" style="display: inline-block; background: transparent; border: 2px solid #78716c; color: #d6d3d1; padding: 14px 35px; border-radius: 50px; text-decoration: none; font-weight: 600; font-size: 13px;">
+                                            🔄 Đặt đơn mới
+                                        </a>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- SUPPORT SECTION -->
+                    <tr>
+                        <td style="background: #1c1917; padding: 25px 35px; border-top: 1px solid #292524;">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td align="center">
+                                        <p style="margin: 0; color: #a8a29e; font-size: 14px; line-height: 1.7;">
+                                            Cần hỗ trợ? Đội ngũ chúng tôi luôn sẵn sàng giúp đỡ bạn!<br>
+                                            <a href="https://napgameuytin.vn/support" style="color: #fbbf24; text-decoration: none; font-weight: 600;">💬 Chat với hỗ trợ viên</a>
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- FOOTER -->
+                    <tr>
+                        <td style="background: #0c0a09; padding: 30px; border-top: 1px solid #1c1917;">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                                <tr>
+                                    <td align="center" style="padding-bottom: 15px;">
+                                        <img src="cid:logo" alt="Napgameuytin" style="height: 35px; border-radius: 8px; opacity: 0.8;">
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td align="center">
+                                        <p style="margin: 0; color: #57534e; font-size: 12px; line-height: 1.8;">
+                                            © 2026 Napgameuytin.vn - Nạp game uy tín hàng đầu Việt Nam<br>
+                                            Đây là email tự động, vui lòng không trả lời trực tiếp.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                </table>
+                
+            </td>
+        </tr>
+    </table>
+
+</body>
+</html>
+        `.trim();
 
         const info = await transporter.sendMail({
             from: '"Napgameuytin Support" <napgameuytin2111@gmail.com>',
             to: email,
-            subject: `⚠️ Đơn hàng #${orderData.id} đã bị hủy`,
+            subject: `⚠️ Đơn hàng #${orderData.id} đã bị hủy - Hoàn tiền ${formattedPrice}`,
             html,
             attachments: [logoAttachment]
         });
@@ -1296,7 +1446,7 @@ async function sendOrderFailureEmail(email, orderData, reason = "Đơn hàng đ�
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-//                              �📦 EXPORTS
+//                              📦 EXPORTS
 // ═══════════════════════════════════════════════════════════════════════════════
 module.exports = {
     sendOTP,
@@ -1308,3 +1458,4 @@ module.exports = {
     sendOrderSuccessEmail,
     sendOrderFailureEmail
 };
+

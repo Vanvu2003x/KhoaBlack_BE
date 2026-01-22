@@ -2,8 +2,9 @@ const express = require('express');
 const router = express.Router();
 const AccOrderController = require('./accOrder.controller');
 const { checkToken } = require('../../middleware/auJWT.middleware');
+const { orderLimiter } = require('../../middleware/rateLimit.middleware');
 
-router.post('/', checkToken, AccOrderController.createOrder); // FE: api.post("/api/accOrder/")
+router.post('/', orderLimiter, checkToken, AccOrderController.createOrder); // FE: api.post("/api/accOrder/")
 router.get('/my-orders', checkToken, AccOrderController.getMyOrders);
 router.get('/user/:user_id', AccOrderController.getOrdersByUserId);
 router.get('/detail/:id', AccOrderController.getOrderById);

@@ -1,5 +1,26 @@
 # Tài Liệu API
 
+## Cấu Hình Socket.IO
+
+Backend sử dụng Socket.IO để giao tiếp realtime với Frontend. Cấu hình trong file `.env`:
+
+```env
+# Socket.IO CORS Configuration
+# Danh sách các origin được phép kết nối (phân cách bằng dấu phẩy)
+# Trong development, để trống hoặc không set để cho phép tất cả
+# Trong production, set các URL frontend của bạn:
+SOCKET_ORIGINS=http://localhost:3000,https://khoablacktopup.vn
+
+# Frontend URL (fallback cho Socket CORS trong production)
+FRONTEND_URL=http://localhost:3000
+```
+
+**Lưu ý:** 
+- Nếu không set `SOCKET_ORIGINS`, backend sẽ cho phép tất cả origin trong development
+- Trong production với `NODE_ENV=production`, backend sẽ sử dụng `FRONTEND_URL` làm fallback
+
+---
+
 ## Module Xác Thực (Auth)
 **Base URL:** `/api/users`
 

@@ -119,6 +119,14 @@ const OrderService = {
                 description: description
             });
 
+            // Emit balance_update for real-time header update
+            try {
+                const { emitToUser } = require("../../sockets/websocket");
+                emitToUser(data.user_id, "balance_update", balanceAfter);
+            } catch (socketError) {
+                console.error("❌ Failed to emit balance_update:", socketError);
+            }
+
             // 7. Create Order
             const newOrder = {
                 user_id: data.user_id,
@@ -308,13 +316,26 @@ const OrderService = {
     completeOrder: async (id) => {
         const updatedOrder = await OrderService.updateOrderStatus(id, "success");
 
+        // Send socket notification (real-time)
+        try {
+            const { emitToUser } = require("../../sockets/websocket");
+            emitToUser(updatedOrder.user_id, "order_status_update", {
+                orderId: id,
+                status: "success",
+                packageName: updatedOrder.package_name,
+                amount: updatedOrder.amount,
+                message: "🎉 Đơn hàng đã hoàn thành!"
+            });
+        } catch (socketError) {
+            console.error('❌ Failed to emit socket:', socketError);
+        }
+
         // Send email notification (non-blocking)
         if (updatedOrder && updatedOrder.user_email) {
             try {
                 await sendOrderSuccessEmail(updatedOrder.user_email, updatedOrder);
             } catch (emailError) {
                 console.error('❌ Failed to send order success email:', emailError);
-                // Don't throw - we don't want email failures to fail the order completion
             }
         }
 
@@ -330,17 +351,30 @@ const OrderService = {
         const refundAmount = order.amount - (order.profit || 0);
         await UserService.updateBalance(order.user_id, refundAmount, 'credit', `Hoàn tiền đơn hàng #${id}`);
 
+        // Send socket notification (real-time)
+        try {
+            const { emitToUser } = require("../../sockets/websocket");
+            emitToUser(order.user_id, "order_status_update", {
+                orderId: id,
+                status: "cancelled",
+                packageName: order.package_name,
+                refundAmount: refundAmount,
+                message: "⚠️ Đơn hàng đã bị hủy và hoàn tiền!"
+            });
+        } catch (socketError) {
+            console.error('❌ Failed to emit socket:', socketError);
+        }
+
         // Send email notification (non-blocking)
         if (order && order.user_email) {
             try {
                 await sendOrderFailureEmail(order.user_email, order, "Đơn hàng đã bị hủy và hoàn tiền");
             } catch (emailError) {
                 console.error('❌ Failed to send order failure email:', emailError);
-                // Don't throw - we don't want email failures to fail the refund process
             }
         }
 
-        return { message: "Cancelled and refunded" };
+        return { message: "Cancelled and refunded", refundAmount };
     },
 
     getUserFinancialSummary: async (userId) => {

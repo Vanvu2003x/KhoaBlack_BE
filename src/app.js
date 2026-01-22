@@ -15,14 +15,24 @@ const accRoute = require("./modules/acc/acc.route.js")
 const accOrdersRoute = require('./modules/acc/accOrder.route.js')
 const app = express();
 
-const corsOptions = {
-  origin: [
+// CORS Configuration - Read from env or use defaults
+const getAllowedOrigins = () => {
+  const originsEnv = process.env.CORS_ORIGINS;
+  if (originsEnv) {
+    return originsEnv.split(',').map(o => o.trim());
+  }
+  // Fallback defaults
+  return [
     "http://localhost:3000",
     "https://khoablacktopup.vn",
     "https://www.khoablacktopup.vn",
     "http://khoablacktopup.vn",
     "http://www.khoablacktopup.vn"
-  ],
+  ];
+};
+
+const corsOptions = {
+  origin: getAllowedOrigins(),
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
   credentials: true
 };
@@ -31,6 +41,10 @@ app.use(cors(corsOptions));
 app.use(cookieParser());
 
 app.use(express.json());
+
+// ✅ Rate Limiting
+const { generalLimiter } = require('./middleware/rateLimit.middleware');
+app.use('/api', generalLimiter); // Apply general limiter to all API routes
 
 // ✅ Static file
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

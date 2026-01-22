@@ -146,31 +146,15 @@ const UserService = {
         const [updatedUser] = await db.select({ balance: users.balance }).from(users).where(eq(users.id, userId));
         const newBalance = updatedUser.balance;
 
-        // Socket logic preserved from original
-        let socketEntry = null;
-        for (const entry of userSocketMap.entries()) {
-            const socketId = entry[0];
-            const user = entry[1];
-            if (user.id === userId) {
-                socketEntry = [socketId, user];
-                break;
-            }
-        }
-
-        if (socketEntry) {
-            const [socketId] = socketEntry;
-            const io = require("../../sockets/websocket").getIO();
-            const socket = io.sockets.sockets.get(socketId);
-            if (socket) {
-                socket.emit("balance_update", newBalance);
-                socket.emit("payment_success", {
-                    redirect: true,
-                    url: "/",
-                    message: "Thanh toán thành công!",
-                    balance: newBalance,
-                });
-            }
-        }
+        // Emit balance update via socket using emitToUser
+        const { emitToUser } = require("../../sockets/websocket");
+        emitToUser(userId, "balance_update", newBalance);
+        emitToUser(userId, "payment_success", {
+            redirect: true,
+            url: "/",
+            message: "Thanh toán thành công!",
+            balance: newBalance,
+        });
 
         return { message: "Cập nhật số dư thành công" };
     },
