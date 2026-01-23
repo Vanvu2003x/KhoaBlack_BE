@@ -71,6 +71,7 @@ app.use('/webhook', webhook);
 app.use('/api/toup-package', toup_packageRoute);
 app.use('/api/acc', accRoute);
 app.use('/api/accOrder', accOrdersRoute);
+app.use('/api/morishop', require('./modules/morishop/morishop.route.js'));
 
 // Error Handling Middleware
 const errorMiddleware = require('./middleware/error.middleware');
