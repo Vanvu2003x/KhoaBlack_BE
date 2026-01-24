@@ -22,11 +22,15 @@ const GameService = {
     createGame: async (data) => {
         const newGame = {
             id: crypto.randomUUID(),
+            api_id: data.api_id, // Store external ID
             name: data.name,
             thumbnail: data.thumbnail,
             server: data.server, // JSON type
             gamecode: data.gamecode,
             publisher: data.publisher,
+            profit_percent_basic: data.profit_percent_basic || 0,
+            profit_percent_pro: data.profit_percent_pro || 0,
+            profit_percent_plus: data.profit_percent_plus || 0,
         };
 
         await db.insert(games).values(newGame);
@@ -40,18 +44,65 @@ const GameService = {
         // Filter out undefined fields
         const updateData = {};
         if (data.name !== undefined) updateData.name = data.name;
+        if (data.api_id !== undefined) updateData.api_id = data.api_id;
         if (data.thumbnail !== undefined && data.thumbnail !== "") updateData.thumbnail = data.thumbnail;
         if (data.server !== undefined) updateData.server = data.server;
         if (data.gamecode !== undefined) updateData.gamecode = data.gamecode;
         if (data.publisher !== undefined) updateData.publisher = data.publisher;
 
+        // Profit Percentages
+        let profitChanged = false;
+        if (data.profit_percent_basic !== undefined) { updateData.profit_percent_basic = Number(data.profit_percent_basic); profitChanged = true; }
+        if (data.profit_percent_pro !== undefined) { updateData.profit_percent_pro = Number(data.profit_percent_pro); profitChanged = true; }
+        if (data.profit_percent_plus !== undefined) { updateData.profit_percent_plus = Number(data.profit_percent_plus); profitChanged = true; }
+
+
         if (Object.keys(updateData).length === 0) {
             throw new Error("Không có trường nào để cập nhật.");
         }
 
-        await db.update(games)
-            .set(updateData)
-            .where(eq(games.id, id));
+        await db.transaction(async (tx) => {
+            // Update Game
+            await tx.update(games)
+                .set(updateData)
+                .where(eq(games.id, id));
+
+            // If Profits Changed, Trigger Cascade Update for Packages
+            if (profitChanged) {
+                // 1. Get current game percentages (merge updateData with existing to be safe, but we have updateData)
+                // Need to fetch full game first if we update partial percentages? 
+                // Let's assume frontend sends all valid percentages or we fetch.
+                const [game] = await tx.select().from(games).where(eq(games.id, id));
+
+                const percentBasic = game.profit_percent_basic || 0;
+                const percentPro = game.profit_percent_pro || 0;
+                const percentPlus = game.profit_percent_plus || 0;
+
+                // 2. Fetch all packages
+                const packages = await tx.select().from(topupPackages).where(eq(topupPackages.game_id, id));
+
+                // 3. Update each package
+                for (const pkg of packages) {
+                    const originPrice = pkg.origin_price || 0;
+
+                    const priceBasic = Math.ceil(originPrice * (1 + percentBasic / 100));
+                    const pricePro = Math.ceil(originPrice * (1 + percentPro / 100));
+                    const pricePlus = Math.ceil(originPrice * (1 + percentPlus / 100));
+
+                    await tx.update(topupPackages)
+                        .set({
+                            price: priceBasic, // Default price
+                            price_basic: priceBasic,
+                            price_pro: pricePro,
+                            price_plus: pricePlus,
+                            profit_percent_basic: percentBasic, // Sync package columns too? Maybe yes for consistency
+                            profit_percent_pro: percentPro,
+                            profit_percent_plus: percentPlus
+                        })
+                        .where(eq(topupPackages.id, pkg.id));
+                }
+            }
+        });
 
         const [updatedGame] = await db.select().from(games).where(eq(games.id, id));
         return updatedGame;

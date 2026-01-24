@@ -17,6 +17,7 @@ const PackageService = {
     getPackagesByGameCode: async (game_code, id_server = null) => {
         let query = db.select({
             id: topupPackages.id,
+            api_id: topupPackages.api_id,
             package_name: topupPackages.package_name,
             game_id: topupPackages.game_id,
             price: topupPackages.price,
@@ -61,23 +62,43 @@ const PackageService = {
         // Handle File
         let thumbnailPath = data.thumbnail; // fallback
         if (file) {
-            // Adjust this path prefix based on your upload config (e.g., /uploads/ or /images/)
-            // Assuming the uploader stores it in a public accessible folder and file.filename is generated
             thumbnailPath = `/uploads/${file.filename}`;
         }
 
+        // Fetch Game Settings for Pricing
+        const [game] = await db.select().from(games).where(eq(games.id, data.game_id));
+        if (!game) throw new Error("Game not found");
+
+        const originPrice = parseInt(data.origin_price || 0);
+
+        // USE GAME PERCENTAGES (Master Rule)
+        const percentBasic = game.profit_percent_basic || 0;
+        const percentPro = game.profit_percent_pro || 0;
+        const percentPlus = game.profit_percent_plus || 0;
+
+        const priceBasic = Math.ceil(originPrice * (1 + percentBasic / 100));
+        const pricePro = Math.ceil(originPrice * (1 + percentPro / 100));
+        const pricePlus = Math.ceil(originPrice * (1 + percentPlus / 100));
+
         const newPackage = {
             id: crypto.randomUUID(),
+            api_id: data.api_id, // Store external ID
             package_name: data.package_name,
             game_id: data.game_id,
-            price: data.price,
-            origin_price: data.origin_price,
-            price_basic: data.price_basic || null,
-            price_pro: data.price_pro || null,
-            price_plus: data.price_plus || null,
+            origin_price: originPrice,
+
+            profit_percent_basic: percentBasic,
+            profit_percent_pro: percentPro,
+            profit_percent_plus: percentPlus,
+
+            price: priceBasic, // Default to basic price
+            price_basic: priceBasic,
+            price_pro: pricePro,
+            price_plus: pricePlus,
+
             thumbnail: thumbnailPath,
             package_type: data.package_type,
-            id_server: data.id_server, // boolean
+            id_server: data.id_server,
             sale: data.sale || false,
             fileAPI: parsedFileAPI,
         };
@@ -96,33 +117,53 @@ const PackageService = {
     },
 
     updatePackage: async (id, data, file) => {
+        const currentPkg = await PackageService.getPackageById(id);
+        if (!currentPkg) throw new Error("Gói không tồn tại");
+
+        // Fetch Game to get current percentages
+        const [game] = await db.select().from(games).where(eq(games.id, currentPkg.game_id));
+        if (!game) throw new Error("Game associated with this package not found");
+
         const updateData = {};
         if (data.package_name !== undefined) updateData.package_name = data.package_name;
-        if (data.price !== undefined) updateData.price = parseInt(data.price);
-        if (data.origin_price !== undefined) updateData.origin_price = parseInt(data.origin_price);
-        if (data.price_basic !== undefined) updateData.price_basic = data.price_basic ? parseInt(data.price_basic) : null;
-        if (data.price_pro !== undefined) updateData.price_pro = data.price_pro ? parseInt(data.price_pro) : null;
-        if (data.price_plus !== undefined) updateData.price_plus = data.price_plus ? parseInt(data.price_plus) : null;
+        if (data.api_id !== undefined) updateData.api_id = data.api_id;
         if (data.package_type !== undefined) updateData.package_type = data.package_type;
-        if (data.thumbnail !== undefined) updateData.thumbnail = data.thumbnail;
         if (data.id_server !== undefined) updateData.id_server = data.id_server;
         if (data.sale !== undefined) updateData.sale = data.sale;
 
+        // Pricing Logic
+        const originPrice = data.origin_price !== undefined ? parseInt(data.origin_price) : currentPkg.origin_price;
+
+        const percentBasic = game.profit_percent_basic || 0;
+        const percentPro = game.profit_percent_pro || 0;
+        const percentPlus = game.profit_percent_plus || 0;
+
+        // Update stored values to match Game
+        updateData.origin_price = originPrice;
+        updateData.profit_percent_basic = percentBasic;
+        updateData.profit_percent_pro = percentPro;
+        updateData.profit_percent_plus = percentPlus;
+
+        // Recalculate Prices
+        updateData.price_basic = Math.ceil(originPrice * (1 + percentBasic / 100));
+        updateData.price_pro = Math.ceil(originPrice * (1 + percentPro / 100));
+        updateData.price_plus = Math.ceil(originPrice * (1 + percentPlus / 100));
+        updateData.price = updateData.price_basic; // Update default price
+
+        // Thumbnail
+        if (data.thumbnail !== undefined) updateData.thumbnail = data.thumbnail;
         if (file) {
             updateData.thumbnail = `/uploads/${file.filename}`;
-
-            // Cleanup old file
-            const oldPkg = await PackageService.getPackageById(id);
-            if (oldPkg && oldPkg.thumbnail) {
-                deleteFile(oldPkg.thumbnail);
+            if (currentPkg.thumbnail) {
+                deleteFile(currentPkg.thumbnail);
             }
         }
 
+        // FileAPI
         if (data.fileAPI !== undefined) {
             try {
                 updateData.fileAPI = typeof data.fileAPI === 'string' ? JSON.parse(data.fileAPI) : data.fileAPI;
             } catch (e) {
-                console.error("Invalid JSON during update:", e.message);
                 updateData.fileAPI = null;
             }
         }
@@ -131,10 +172,7 @@ const PackageService = {
             throw new Error("Không có dữ liệu nào để cập nhật");
         }
 
-        await db.update(topupPackages)
-            .set(updateData)
-            .where(eq(topupPackages.id, id));
-
+        await db.update(topupPackages).set(updateData).where(eq(topupPackages.id, id));
         const [updated] = await db.select().from(topupPackages).where(eq(topupPackages.id, id));
         return updated;
     },

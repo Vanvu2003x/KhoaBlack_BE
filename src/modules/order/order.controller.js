@@ -8,6 +8,10 @@ const OrderController = {
             ...req.body,
             user_id: req.user.id
         };
+        console.log("-----------------------------------------");
+        console.log(`[API] Create Order Request received from User: ${req.user.id}`);
+        console.log(`[API] Payload:`, JSON.stringify(req.body));
+
         const result = await OrderService.createOrder(orderData);
         res.status(201).json(result);
     }),

@@ -47,3 +47,8 @@ setInterval(() => {
   WalletLogService.autoCheckExpiredTransactions();
 }, 60 * 1000); // Check every 60 seconds
 
+// ✅ Initialize Cron Jobs
+const { initCronJobs } = require('./services/cron.service');
+initCronJobs();
+
+

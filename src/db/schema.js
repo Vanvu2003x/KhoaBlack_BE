@@ -28,16 +28,22 @@ const users = mysqlTable('users', {
 // Games Table
 const games = mysqlTable('games', {
     id: varchar('id', { length: 36 }).primaryKey(), // UUID
+    api_id: int('api_id'), // ID from external API/Cron
     name: varchar('name', { length: 50 }).notNull(),
     thumbnail: varchar('thumbnail', { length: 500 }),
     server: json('server'), // Array of servers
+    input_fields: json('input_fields'), // Store external form fields config (IDs for UID, Server, etc.)
     gamecode: varchar('gamecode', { length: 50 }).unique(),
     publisher: varchar('publisher', { length: 50 }),
+    profit_percent_basic: int('profit_percent_basic').default(0),
+    profit_percent_pro: int('profit_percent_pro').default(0),
+    profit_percent_plus: int('profit_percent_plus').default(0),
 });
 
 // Topup Packages Table
 const topupPackages = mysqlTable('topup_packages', {
     id: varchar('id', { length: 36 }).primaryKey(), // UUID
+    api_id: int('api_id'), // ID from external API/Cron
     package_name: varchar('package_name', { length: 255 }).notNull(),
     game_id: varchar('game_id', { length: 36 }).notNull(), // FK to games
     price: int('price').notNull(), // Default price (used as fallback)
@@ -51,14 +57,19 @@ const topupPackages = mysqlTable('topup_packages', {
     fileAPI: json('fileAPI'),
     id_server: boolean('id_server').default(false),
     sale: boolean('sale').default(false),
+    profit_percent_basic: int('profit_percent_basic').default(0),
+    profit_percent_pro: int('profit_percent_pro').default(0),
+    profit_percent_plus: int('profit_percent_plus').default(0),
 });
 
 // Orders Table
 const orders = mysqlTable('orders', {
     id: serial('id').primaryKey(),
+    api_id: int('api_id'), // External Order ID (NapGame247)
     user_id: varchar('user_id', { length: 36 }).notNull(), // FK to users
     package_id: varchar('package_id', { length: 36 }).notNull(), // FK to topup_packages
     amount: int('amount').notNull(),
+    quantity: int('quantity').default(1),
     status: varchar('status', { length: 50 }).default('pending'),
     account_info: json('account_info'),
     profit: int('profit').default(0),

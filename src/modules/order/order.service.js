@@ -42,7 +42,12 @@ const buildOrderQuery = () => {
 
 const OrderService = {
     createOrder: async (data) => {
-        return await db.transaction(async (tx) => {
+        console.log(`[OrderService] Processing createOrder for User ${data.user_id}`);
+        let createdOrder = null;
+        let packageDetails = null;
+        const qty = data.quantity || 1;
+
+        await db.transaction(async (tx) => {
             // 1. Fetch User (Balance & Level)
             const [user] = await tx.select({
                 id: users.id,
@@ -51,6 +56,7 @@ const OrderService = {
             }).from(users).where(eq(users.id, data.user_id));
 
             if (!user) {
+                console.error(`[OrderService] User ${data.user_id} not found.`);
                 throw { status: 404, message: 'Người dùng không tồn tại' };
             }
 
@@ -65,30 +71,39 @@ const OrderService = {
                     price_pro: topupPackages.price_pro,
                     price_plus: topupPackages.price_plus,
                     game_name: games.name,
-                    game_code: games.gamecode
+                    game_code: games.gamecode,
+                    game_id: games.id,
+                    fileAPI: topupPackages.fileAPI, // Fetch fileAPI to get external ID
+                    input_fields: games.input_fields // Fetch input mapping config
                 })
                 .from(topupPackages)
                 .innerJoin(games, eq(topupPackages.game_id, games.id))
                 .where(eq(topupPackages.id, data.package_id));
 
             if (!packageInfo) {
+                console.error(`[OrderService] Package ${data.package_id} not found.`);
                 throw { status: 404, message: 'Gói nạp không tồn tại' };
             }
 
+            console.log(`[OrderService] Package Found: ${packageInfo.package_name} (Game: ${packageInfo.game_name})`);
+            packageDetails = packageInfo;
+
             // 3. Calculate Valid Price
-            let finalPrice = packageInfo.price; // Default
+            let unitPrice = packageInfo.price; // Default
             const level = user.level || 1;
 
-            if (level === 2 && packageInfo.price_pro) finalPrice = packageInfo.price_pro;
-            if (level === 3 && packageInfo.price_plus) finalPrice = packageInfo.price_plus;
+            if (level === 2 && packageInfo.price_pro) unitPrice = packageInfo.price_pro;
+            if (level === 3 && packageInfo.price_plus) unitPrice = packageInfo.price_plus;
 
             // Allow Basic override if set (unlikely but safe)
-            if (level === 1 && packageInfo.price_basic) finalPrice = packageInfo.price_basic;
+            if (level === 1 && packageInfo.price_basic) unitPrice = packageInfo.price_basic;
 
+            const finalPrice = unitPrice * qty;
 
             // 4. Validate Balance
             if (Number(user.balance) < finalPrice) {
                 const missing = finalPrice - Number(user.balance);
+                console.warn(`[OrderService] Insufficient Balance. User: ${user.balance}, Need: ${finalPrice}`);
                 throw {
                     status: 400,
                     message: `Số dư không đủ! Hiện có: ${Number(user.balance).toLocaleString('vi-VN')}đ. Cần: ${finalPrice.toLocaleString('vi-VN')}đ. Thiếu: ${missing.toLocaleString('vi-VN')}đ. Vui lòng nạp thêm!`
@@ -97,10 +112,10 @@ const OrderService = {
 
             // 5. Calculate Profit
             // Profit = Selling Price - Origin Price
-            const originPrice = packageInfo.origin_price || 0;
+            const originPrice = (packageInfo.origin_price || 0) * qty;
             const finalProfit = finalPrice - originPrice;
 
-            const description = `Thanh toán gói ${packageInfo.package_name} - ${packageInfo.game_name}`;
+            const description = `Thanh toán gói ${packageInfo.package_name} - ${packageInfo.game_name} (x${qty})`;
 
             // 6. Deduct Balance
             const balanceBefore = Number(user.balance);
@@ -134,15 +149,116 @@ const OrderService = {
                 account_info: data.account_info,
                 amount: finalPrice, // Secure Price
                 profit: finalProfit, // Secure Profit
-                status: 'pending'
+                quantity: qty,
+                status: 'pending' // Default pending, will trigger forwarding
             };
 
-            const [result] = await tx.insert(orders).values(newOrder);
+            await tx.insert(orders).values(newOrder);
 
             // Fetch created order (Assuming result might not provide full row in all drivers, reusing safe fetch)
             const [created] = await tx.select().from(orders).orderBy(desc(orders.id)).limit(1);
-            return created;
+            createdOrder = created;
+            console.log(`[OrderService] Order Created Successfully. Order ID: ${createdOrder.id}`);
         });
+
+        // Post-Transaction: Forward to NapGame247
+        if (createdOrder && packageDetails) {
+            console.log("[OrderService] Triggering NapGame247 forwarding check...");
+            const NapGame247Service = require("../napgame247/napgame247.service");
+
+            // Determine External IDs and Map Fields
+            try {
+                // OPTIMIZATION: We already fetched packageDetails with joined game info and input_fields in step 2.
+                // We reuse packageDetails.
+
+                // Fallback / Validation query if needed, but let's trust packageDetails structure
+                // packageDetails.fileAPI may contain { game_api_id: ... } from sync
+                // packageDetails.input_fields contains the form mapping
+
+                // Get fresh IDs just in case
+                const { topupPackages, games } = require("../../db/schema");
+                const [pkg] = await db.select().from(topupPackages).where(eq(topupPackages.id, data.package_id));
+                const [game] = await db.select().from(games).where(eq(games.id, pkg.game_id));
+
+                const extGameId = game?.api_id;
+                const extPkgId = pkg?.api_id;
+                const inputFields = game?.input_fields || [];
+
+                console.log(`[OrderService] External Mapping -> Game ExtID: ${extGameId}, Package ExtID: ${extPkgId}`);
+
+                if (extGameId && extPkgId) {
+                    // PREPARE DYNAMIC PARAMS
+                    // Fix: Parse account_info if it's a string (from frontend JSON.stringify)
+                    let accountInfo = data.account_info;
+                    if (typeof accountInfo === 'string') {
+                        try {
+                            accountInfo = JSON.parse(accountInfo);
+                        } catch (e) {
+                            console.error("[OrderService] Failed to parse account_info JSON:", e);
+                            accountInfo = {};
+                        }
+                    } else {
+                        accountInfo = accountInfo || {};
+                    }
+
+                    console.log(`[OrderService] Parsed Account Info:`, JSON.stringify(accountInfo));
+                    console.log(`[OrderService] Input Fields Config:`, JSON.stringify(inputFields));
+
+                    const dynamicParams = {};
+
+                    if (Array.isArray(inputFields)) {
+                        inputFields.forEach(field => {
+                            // Logic to find matching value in accountInfo
+                            // Lowercase normalization for matching
+                            const fieldName = (field.name || "").toLowerCase();
+
+                            let value = null;
+                            // Heuristic matching
+                            if (fieldName.includes('id') || fieldName.includes('uid') || fieldName.includes('tài khoản')) {
+                                value = accountInfo.uid || accountInfo.id || accountInfo.username;
+                            } else if (fieldName.includes('server') || fieldName.includes('máy chủ')) {
+                                value = accountInfo.server;
+                            } else if (fieldName.includes('zone') || fieldName.includes('khu vực')) {
+                                value = accountInfo.zone || accountInfo.server;
+                            }
+
+                            // If we found a value, map it to fields_{id}
+                            if (value) {
+                                dynamicParams[`fields_${field.id}`] = value;
+                            }
+                        });
+                    }
+
+                    console.log(`[OrderService] Constructed Dynamics:`, dynamicParams);
+                    console.log(`[OrderService] Call NapGame247 API: Game=${extGameId}, Pkg=${extPkgId}, Qty=${qty}`);
+
+                    NapGame247Service.buyItem(extGameId, extPkgId, qty, dynamicParams).then(async (res) => {
+                        console.log("[OrderService] NapGame247 Result:", JSON.stringify(res));
+
+                        if (res && res.status === 'success' && res.data && res.data.id) {
+                            // Update local order with external ID AND status
+                            await db.update(orders)
+                                .set({
+                                    api_id: res.data.id,
+                                    status: 'processing', // Mark as processing since it was accepted
+                                    updated_at: new Date()
+                                })
+                                .where(eq(orders.id, createdOrder.id));
+
+                            console.log(`[OrderService] Order #${createdOrder.id} LINKED & PROCESSING. External Order ID: ${res.data.id}`);
+                        } else {
+                            console.error(`[OrderService] Order #${createdOrder.id} FAILED TO LINK (Forward Error):`, res?.message || "Unknown error");
+                        }
+                    }).catch(err => console.error("[OrderService] NapGame247 Call Exception:", err));
+                } else {
+                    console.log("[OrderService] Skip Forwarding: Game or Package missing 'api_id' (Not a synced product).");
+                }
+            } catch (err) {
+                console.error("[OrderService] Error preparing NapGame247 forward:", err);
+            }
+        }
+
+        return createdOrder;
     },
 
     getAllOrders: async (page = 1) => {
