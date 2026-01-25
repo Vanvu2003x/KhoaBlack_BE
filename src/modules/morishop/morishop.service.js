@@ -123,7 +123,10 @@ class MorishopService {
                     gamecode: gamecode,
                     thumbnail: '/uploads/default-game.png',
                     publisher: 'Morishop',
-                    input_fields: [{ id: 'target', name: 'User ID', type: 'text' }]
+                    input_fields: [
+                        { id: 'user_id', name: 'User ID', type: 'text' },
+                        { id: 'server_id', name: 'Server ID', type: 'text' }
+                    ]
                 });
 
                 [existingGame] = await db.select().from(games).where(eq(games.id, newGameId));
@@ -149,7 +152,7 @@ class MorishopService {
 
                 const serviceId = pkg.id;
                 const packageName = pkg.nama_layanan?.trim();
-                const originPrice = pkg.harga;
+                const apiPrice = pkg.harga_pro;
 
                 if (!packageName) continue;
 
@@ -161,12 +164,16 @@ class MorishopService {
                     )
                 );
 
-                // Get game profit percentages
+                // Get game markup and profit percentages
+                const originMarkup = existingGame.origin_markup_percent || 0;
                 const percentBasic = existingGame.profit_percent_basic || 0;
                 const percentPro = existingGame.profit_percent_pro || 0;
                 const percentPlus = existingGame.profit_percent_plus || 0;
 
-                // Calculate selling prices
+                // Step 1: Calculate origin price from API price
+                const originPrice = Math.ceil(apiPrice * (1 + originMarkup / 100));
+
+                // Step 2: Calculate selling prices from origin price
                 const priceBasic = Math.ceil(originPrice * (1 + percentBasic / 100));
                 const pricePro = Math.ceil(originPrice * (1 + percentPro / 100));
                 const pricePlus = Math.ceil(originPrice * (1 + percentPlus / 100));
@@ -175,6 +182,7 @@ class MorishopService {
                     // Update package
                     await db.update(topupPackages)
                         .set({
+                            api_price: apiPrice,
                             origin_price: originPrice,
                             price: priceBasic,
                             price_basic: priceBasic,
@@ -194,6 +202,7 @@ class MorishopService {
                         id: crypto.randomUUID(),
                         game_id: existingGame.id,
                         package_name: packageName,
+                        api_price: apiPrice,
                         origin_price: originPrice,
                         price: priceBasic,
                         price_basic: priceBasic,
@@ -217,11 +226,15 @@ class MorishopService {
     /**
      * Forward order to Morishop API
      * @param {string} serviceId - The service_id from fileAPI
-     * @param {string} target - User ID/target from account_info
-     * @param {string} [idtrx] - Optional internal transaction ID
+     * @param {string} userId - User ID from account_info
+     * @param {string} serverId - Server ID from account_info
+     * @param {string} [idtrx] - Optional internal transaction ID (order ID from our system)
+     * @param {string} [kontak] - Optional contact phone
      */
-    async buyItem(serviceId, target, idtrx = null) {
-        console.log(`[Morishop] Forwarding order: service=${serviceId}, target=${target}`);
+    async buyItem(serviceId, userId, serverId, idtrx = null, kontak = null) {
+        // Format target as uid|server_id
+        const target = `${userId}|${serverId}`;
+        console.log(`[Morishop] Forwarding order: service=${serviceId}, target=${target}, idtrx=${idtrx}`);
 
         const orderData = {
             service_id: serviceId,
@@ -232,9 +245,24 @@ class MorishopService {
             orderData.idtrx = idtrx;
         }
 
+        if (kontak) {
+            orderData.kontak = kontak;
+        }
+
         const result = await this.createOrder(orderData);
         console.log('[Morishop] Order result:', result);
 
+        return result;
+    }
+
+    /**
+     * Check order status from Morishop
+     * @param {string} orderId - The order ID from Morishop response
+     */
+    async checkOrderStatus(orderId) {
+        console.log(`[Morishop] Checking order status: ${orderId}`);
+        const result = await this.checkStatus(orderId);
+        console.log('[Morishop] Status result:', result);
         return result;
     }
 }

@@ -1,10 +1,36 @@
 const napGame247Service = require('../napgame247/napgame247.service');
 const morishopService = require('../morishop/morishop.service');
 const { db } = require("../../configs/drizzle");
-const { orders } = require("../../db/schema");
+const { orders, users, topupPackages, games } = require("../../db/schema");
 const { eq, and, isNotNull, sql } = require("drizzle-orm");
+const { sendOrderSuccessEmail, sendOrderFailureEmail } = require("../../services/nodemailer.service");
 
 class ToolsGameService {
+    /**
+     * Get order details with user email, game name, and package name for email
+     */
+    async getOrderDetailsForEmail(order) {
+        try {
+            const [user] = await db.select().from(users).where(eq(users.id, order.user_id));
+            const [pkg] = await db.select().from(topupPackages).where(eq(topupPackages.id, order.package_id));
+            const [game] = pkg ? await db.select().from(games).where(eq(games.id, pkg.game_id)) : [null];
+
+            return {
+                id: order.id,
+                amount: order.amount,
+                created_at: order.created_at,
+                user_email: user?.email,
+                user_name: user?.name || user?.email?.split('@')[0],
+                game_name: game?.name || 'N/A',
+                package_name: pkg?.package_name || 'N/A',
+                account_info: order.account_info
+            };
+        } catch (err) {
+            console.error('[ToolsGame] Error getting order details:', err.message);
+            return null;
+        }
+    }
+
     /**
      * Helper logic to be executed periodically
      */
@@ -25,12 +51,12 @@ class ToolsGameService {
                 'Honor Of Kings'
             ]);
 
-            // 3. Check Order Statuses
-            console.log("Checking pending NapGame247 orders...");
-            // Get orders that are pending AND have an api_id (meaning they were forwarded)
+            // 3. Check Order Statuses - Both NapGame247 and Morishop
+            console.log("Checking pending orders...");
+            // Get orders that are pending/processing AND have an api_id
             const pendingOrders = await db.select().from(orders).where(
                 and(
-                    eq(orders.status, 'pending'),
+                    sql`${orders.status} IN ('pending', 'processing')`,
                     isNotNull(orders.api_id)
                 )
             );
@@ -38,46 +64,99 @@ class ToolsGameService {
             console.log(`Found ${pendingOrders.length} pending orders to check.`);
 
             for (const order of pendingOrders) {
-                const apiResult = await napGame247Service.checkOrderStatus(order.api_id);
-                // User snippet response:
-                // { "status": "success", "data": { "status": "pending", ... } }
-                // OR
-                // { ..., "data": { "status": "paid", ... } } -> "paid" might mean processing?
-                // User said: pending (Đang xử lý), success (Thành công), cancel (Hủy đơn)
-                // In snippet: "status": "paid" inside data.
+                try {
+                    // Determine API source by api_id format
+                    // Morishop: ORDER... format, NapGame247: numeric ID
+                    const isMorishop = order.api_id && order.api_id.toString().startsWith('ORDER');
 
-                if (apiResult && apiResult.status === 'success' && apiResult.data) {
-                    const remoteData = apiResult.data;
-
-                    // User response: "status":"complete" in data, but "order_details":[{"status":"success"}]
-                    // Priority: Chech order_details first if available
-                    let remoteStatus = remoteData.status;
-
-                    if (remoteData.order_details && Array.isArray(remoteData.order_details) && remoteData.order_details.length > 0) {
-                        // Assuming 1 order = 1 package, check the first detail
-                        remoteStatus = remoteData.order_details[0].status;
+                    let apiResult;
+                    if (isMorishop) {
+                        // Check Morishop order
+                        apiResult = await morishopService.checkOrderStatus(order.api_id);
+                    } else {
+                        // Check NapGame247 order
+                        apiResult = await napGame247Service.checkOrderStatus(order.api_id);
                     }
 
-                    console.log(`Order #${order.id} (Ext: ${order.api_id}) -> Remote Status: ${remoteStatus}`);
+                    if (!apiResult) continue;
 
-                    // Map remote status to local
-                    if (remoteStatus === 'success' || remoteStatus === 'complete' || remoteStatus === 'completed') {
-                        // Success
-                        await db.update(orders).set({ status: 'success', updated_at: new Date() }).where(eq(orders.id, order.id));
-                        console.log(`Order #${order.id} marked as SUCCESS.`);
+                    // Handle Morishop response: { status: true, data: { status: "success"|"pending" } }
+                    if (isMorishop && apiResult.status === true && apiResult.data) {
+                        const remoteStatus = apiResult.data.status;
+                        console.log(`Order #${order.id} (Morishop: ${order.api_id}) -> Remote Status: ${remoteStatus}`);
 
-                    } else if (remoteStatus === 'cancel' || remoteStatus === 'cancelled' || remoteStatus === 'failed') {
-                        // Cancel/Fail
-                        const UserService = require("../user/user.service");
+                        if (remoteStatus === 'success' || remoteStatus === 'completed') {
+                            await db.update(orders).set({ status: 'success', updated_at: new Date() }).where(eq(orders.id, order.id));
+                            console.log(`Order #${order.id} marked as SUCCESS.`);
 
-                        await db.transaction(async (tx) => {
-                            await tx.update(orders).set({ status: 'cancelled', updated_at: new Date() }).where(eq(orders.id, order.id));
-                            const refundAmount = Number(order.amount);
-                            await UserService.updateBalance(order.user_id, refundAmount, 'credit', `Hoàn tiền đơn hàng #${order.id} (Hủy từ nguồn)`);
-                        });
-                        console.log(`Order #${order.id} marked as CANCELLED and refunded.`);
+                            // Send success email
+                            const orderDetails = await this.getOrderDetailsForEmail(order);
+                            if (orderDetails?.user_email) {
+                                sendOrderSuccessEmail(orderDetails.user_email, orderDetails).catch(err =>
+                                    console.error(`Failed to send success email for order #${order.id}:`, err.message)
+                                );
+                            }
+                        } else if (remoteStatus === 'cancel' || remoteStatus === 'cancelled' || remoteStatus === 'failed') {
+                            const UserService = require("../user/user.service");
+                            await db.transaction(async (tx) => {
+                                await tx.update(orders).set({ status: 'cancelled', updated_at: new Date() }).where(eq(orders.id, order.id));
+                                const refundAmount = Number(order.amount);
+                                await UserService.updateBalance(order.user_id, refundAmount, 'credit', `Hoàn tiền đơn hàng #${order.id} (Hủy từ Morishop)`);
+                            });
+                            console.log(`Order #${order.id} marked as CANCELLED and refunded.`);
+
+                            // Send failure email
+                            const orderDetails = await this.getOrderDetailsForEmail(order);
+                            if (orderDetails?.user_email) {
+                                sendOrderFailureEmail(orderDetails.user_email, orderDetails, 'Đơn hàng bị hủy từ nhà cung cấp').catch(err =>
+                                    console.error(`Failed to send failure email for order #${order.id}:`, err.message)
+                                );
+                            }
+                        }
+                        // pending -> do nothing
+
+                    } else if (!isMorishop && apiResult.status === 'success' && apiResult.data) {
+                        // Handle NapGame247 response
+                        const remoteData = apiResult.data;
+                        let remoteStatus = remoteData.status;
+
+                        if (remoteData.order_details && Array.isArray(remoteData.order_details) && remoteData.order_details.length > 0) {
+                            remoteStatus = remoteData.order_details[0].status;
+                        }
+
+                        console.log(`Order #${order.id} (NapGame247: ${order.api_id}) -> Remote Status: ${remoteStatus}`);
+
+                        if (remoteStatus === 'success' || remoteStatus === 'complete' || remoteStatus === 'completed') {
+                            await db.update(orders).set({ status: 'success', updated_at: new Date() }).where(eq(orders.id, order.id));
+                            console.log(`Order #${order.id} marked as SUCCESS.`);
+
+                            // Send success email
+                            const orderDetails = await this.getOrderDetailsForEmail(order);
+                            if (orderDetails?.user_email) {
+                                sendOrderSuccessEmail(orderDetails.user_email, orderDetails).catch(err =>
+                                    console.error(`Failed to send success email for order #${order.id}:`, err.message)
+                                );
+                            }
+                        } else if (remoteStatus === 'cancel' || remoteStatus === 'cancelled' || remoteStatus === 'failed') {
+                            const UserService = require("../user/user.service");
+                            await db.transaction(async (tx) => {
+                                await tx.update(orders).set({ status: 'cancelled', updated_at: new Date() }).where(eq(orders.id, order.id));
+                                const refundAmount = Number(order.amount);
+                                await UserService.updateBalance(order.user_id, refundAmount, 'credit', `Hoàn tiền đơn hàng #${order.id} (Hủy từ NapGame247)`);
+                            });
+                            console.log(`Order #${order.id} marked as CANCELLED and refunded.`);
+
+                            // Send failure email
+                            const orderDetails = await this.getOrderDetailsForEmail(order);
+                            if (orderDetails?.user_email) {
+                                sendOrderFailureEmail(orderDetails.user_email, orderDetails, 'Đơn hàng bị hủy từ nhà cung cấp').catch(err =>
+                                    console.error(`Failed to send failure email for order #${order.id}:`, err.message)
+                                );
+                            }
+                        }
                     }
-                    // If 'pending' or 'paid' (processing), do nothing.
+                } catch (orderError) {
+                    console.error(`Error checking order #${order.id}:`, orderError.message);
                 }
             }
 

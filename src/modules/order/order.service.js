@@ -198,30 +198,32 @@ const OrderService = {
                 if (apiSource === 'morishop') {
                     // === MORISHOP FORWARD ===
                     const serviceId = fileAPI.service_id;
-                    const target = accountInfo.uid || accountInfo.id || accountInfo.target || accountInfo.username;
+                    const userId = accountInfo.user_id || accountInfo.uid || accountInfo.id;
+                    const serverId = accountInfo.server_id || accountInfo.server || '';
 
-                    if (serviceId && target) {
-                        console.log(`[OrderService] Forwarding to Morishop: service=${serviceId}, target=${target}`);
+                    if (serviceId && userId) {
+                        console.log(`[OrderService] Forwarding to Morishop: service=${serviceId}, userId=${userId}, serverId=${serverId}`);
 
-                        MorishopService.buyItem(serviceId, target, createdOrder.id.toString()).then(async (res) => {
+                        MorishopService.buyItem(serviceId, userId, serverId, createdOrder.id.toString()).then(async (res) => {
                             console.log("[OrderService] Morishop Result:", JSON.stringify(res));
 
-                            if (res && res.status === true && res.data && res.data.order_id) {
+                            // Morishop returns { status: true, data: { id: "ORDER...", status: "pending" } }
+                            if (res && res.status === true && res.data && res.data.id) {
                                 await db.update(orders)
                                     .set({
-                                        api_id: res.data.order_id,
+                                        api_id: res.data.id, // Morishop returns id, not order_id
                                         status: 'processing',
                                         updated_at: new Date()
                                     })
                                     .where(eq(orders.id, createdOrder.id));
 
-                                console.log(`[OrderService] Order #${createdOrder.id} LINKED to Morishop. External ID: ${res.data.order_id}`);
+                                console.log(`[OrderService] Order #${createdOrder.id} LINKED to Morishop. External ID: ${res.data.id}`);
                             } else {
                                 console.error(`[OrderService] Order #${createdOrder.id} Morishop Forward Failed:`, res?.msg || "Unknown error");
                             }
                         }).catch(err => console.error("[OrderService] Morishop Call Exception:", err));
                     } else {
-                        console.log("[OrderService] Skip Morishop: Missing service_id or target");
+                        console.log("[OrderService] Skip Morishop: Missing service_id or user_id");
                     }
 
                 } else if (apiSource === 'napgame247' || game?.api_id) {
