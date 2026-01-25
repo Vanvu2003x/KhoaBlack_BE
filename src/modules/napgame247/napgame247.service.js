@@ -17,12 +17,13 @@ class NapGame247Service {
         try {
             const apiKey = this.getApiKey();
             if (!apiKey) {
-                console.error("NAPGAME247_API_KEY is not configured.");
+                console.error("[NapGame247] NAPGAME247_API_KEY is not configured.");
                 return null;
             }
 
-            // Using the URL structure provided by user: https://napgame247.vn/api/products/?api_key=...&id=12
-            // However, axios params are cleaner.
+            const requestUrl = `${this.baseUrl}?id=${id}`;
+            console.log(`[NapGame247][${new Date().toISOString()}] Request: GET ${requestUrl}`);
+
             const response = await axios.get(this.baseUrl, {
                 params: {
                     api_key: apiKey,
@@ -30,9 +31,12 @@ class NapGame247Service {
                 }
             });
 
+            console.log(`[NapGame247][${new Date().toISOString()}] Response:`, JSON.stringify(response.data).substring(0, 500) + '...');
+
             return response.data;
         } catch (error) {
-            console.error('Error fetching NapGame247 products:', error.message);
+            console.error(`[NapGame247][${new Date().toISOString()}] Error fetching products:`, error.response?.data || error.message);
+            console.error(`[NapGame247] Full error:`, error.response?.status, error.response?.statusText);
             return null;
         }
     }
