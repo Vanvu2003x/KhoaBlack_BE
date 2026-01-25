@@ -13,7 +13,7 @@ class NapGame247Service {
         return process.env.NAPGAME247_API_KEY;
     }
 
-    async fetchProducts(id = 12) {
+    async fetchProducts() {
         try {
             const apiKey = this.getApiKey();
             if (!apiKey) {
@@ -21,14 +21,12 @@ class NapGame247Service {
                 return null;
             }
 
-            const fullUrl = `${this.baseUrl}?api_key=${apiKey}&id=${id}`;
-            console.log(`[NapGame247] Request: GET ${this.baseUrl}?id=${id}`);
+            console.log(`[NapGame247] Request: GET ${this.baseUrl}`);
             console.log(`[NapGame247] API Key (first 20 chars): ${apiKey.substring(0, 20)}...`);
 
             const response = await axios.get(this.baseUrl, {
                 params: {
-                    api_key: apiKey,
-                    id: id
+                    api_key: apiKey
                 }
             });
 
