@@ -21,8 +21,6 @@ class MorishopService {
                 throw new Error("MORISHOP_API_KEY is not configured on the server.");
             }
 
-            console.log(`[Morishop][${new Date().toISOString()}] Request ${endpoint}:`, JSON.stringify(payload));
-
             const response = await axios.post(`${this.baseUrl}${endpoint}`, {
                 api_key: apiKey,
                 ...payload
@@ -32,12 +30,9 @@ class MorishopService {
                 }
             });
 
-            console.log(`[Morishop][${new Date().toISOString()}] Response ${endpoint}:`, JSON.stringify(response.data));
-
             return response.data;
         } catch (error) {
-            console.error(`[Morishop][${new Date().toISOString()}] Error ${endpoint}:`, error.response?.data || error.message);
-            // Return a standardized error structure if the API call fails externally
+            console.error(`[Morishop] Error ${endpoint}:`, error.response?.data || error.message);
             return {
                 status: false,
                 msg: error.response?.data?.msg || error.message || 'Internal Server Error',
