@@ -87,13 +87,24 @@ class MorishopService {
             return;
         }
 
-        // Morishop returns: { status: true, data: [{ game: "Game Name", layanan: [...] }] }
+        // Morishop returns: { status: true, data: [{ id, nama_layanan, kategori, harga, status }] }
+        // kategori = game name, nama_layanan = package name, id = service_id
         const allServices = response.data;
-        console.log(`[Morishop] Found ${allServices.length} games in API`);
+        console.log(`[Morishop] Found ${allServices.length} services in API`);
 
-        for (const gameData of allServices) {
-            const gameName = gameData.game;
+        // Group services by kategori (game name)
+        const gameGroups = {};
+        for (const service of allServices) {
+            const gameName = service.kategori;
+            if (!gameGroups[gameName]) {
+                gameGroups[gameName] = [];
+            }
+            gameGroups[gameName].push(service);
+        }
 
+        console.log(`[Morishop] Found ${Object.keys(gameGroups).length} unique games`);
+
+        for (const gameName of Object.keys(gameGroups)) {
             // Skip if not in allowed list
             if (!allowedGameNames.includes(gameName)) {
                 continue;
@@ -117,7 +128,7 @@ class MorishopService {
                     gamecode: gamecode,
                     thumbnail: '/uploads/default-game.png',
                     publisher: 'Morishop',
-                    input_fields: [{ id: 'target', name: 'User ID', type: 'text' }] // Morishop uses single target field
+                    input_fields: [{ id: 'target', name: 'User ID', type: 'text' }]
                 });
 
                 [existingGame] = await db.select().from(games).where(eq(games.id, newGameId));
@@ -131,15 +142,21 @@ class MorishopService {
                     .where(eq(games.id, existingGame.id));
             }
 
-            // Sync packages (layanan)
-            const packages = gameData.layanan || [];
+            // Sync packages for this game
+            const packages = gameGroups[gameName];
             console.log(`[Morishop] Found ${packages.length} packages for ${gameName}`);
 
             for (const pkg of packages) {
-                // pkg structure: { layanan: "service_id", name: "Package Name", harga: 1000 }
-                const serviceId = pkg.layanan;
-                const packageName = pkg.name;
+                // Skip inactive packages
+                if (pkg.status !== 'aktif') {
+                    continue;
+                }
+
+                const serviceId = pkg.id;
+                const packageName = pkg.nama_layanan?.trim();
                 const originPrice = pkg.harga;
+
+                if (!packageName) continue;
 
                 // Check if package exists
                 const [existingPackage] = await db.select().from(topupPackages).where(
@@ -161,8 +178,6 @@ class MorishopService {
 
                 if (existingPackage) {
                     // Update package
-                    console.log(`[Morishop] Updating package: ${packageName} - Origin: ${originPrice}`);
-
                     await db.update(topupPackages)
                         .set({
                             origin_price: originPrice,
