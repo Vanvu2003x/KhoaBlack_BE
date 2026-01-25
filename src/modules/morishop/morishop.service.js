@@ -150,9 +150,14 @@ class MorishopService {
                     continue;
                 }
 
+                // IDR to VND Exchange Rate (Hardcoded for now, can be moved to DB/Env)
+                const IDR_TO_VND_RATE = 1.56;
+
                 const serviceId = pkg.id;
                 const packageName = pkg.nama_layanan?.trim();
-                const apiPrice = pkg.harga_pro;
+
+                // Convert IDR (Rp) to VND
+                const apiPrice = Math.ceil(pkg.harga_pro * IDR_TO_VND_RATE);
 
                 if (!packageName) continue;
 
@@ -170,7 +175,7 @@ class MorishopService {
                 const percentPro = existingGame.profit_percent_pro || 0;
                 const percentPlus = existingGame.profit_percent_plus || 0;
 
-                // Step 1: Calculate origin price from API price
+                // Step 1: Calculate origin price from API price (VND)
                 const originPrice = Math.ceil(apiPrice * (1 + originMarkup / 100));
 
                 // Step 2: Calculate selling prices from origin price
@@ -232,21 +237,23 @@ class MorishopService {
      * @param {string} [kontak] - Optional contact phone
      */
     async buyItem(serviceId, userId, serverId, idtrx = null, kontak = null) {
-        // Format target as uid|server_id
-        const target = `${userId}|${serverId}`;
+        // Format target as uid|server_id if serverId exists, otherwise just uid
+        const target = serverId ? `${userId}|${serverId}` : userId;
         console.log(`[Morishop] Forwarding order: service=${serviceId}, target=${target}, idtrx=${idtrx}`);
 
+        if (!serviceId) {
+            console.error('[Morishop] Missing serviceId for buyItem');
+            return { status: false, msg: 'Missing serviceId' };
+        }
+
         const orderData = {
-            service_id: serviceId,
-            target: target
+            service_id: serviceId, // Reverted to service_id as per user example
+            target: target,
+            kontak: kontak || '08123456789' // Default contact to prevent "Input tidak boleh kosong"
         };
 
         if (idtrx) {
             orderData.idtrx = idtrx;
-        }
-
-        if (kontak) {
-            orderData.kontak = kontak;
         }
 
         const result = await this.createOrder(orderData);
