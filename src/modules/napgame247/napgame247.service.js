@@ -21,8 +21,9 @@ class NapGame247Service {
                 return null;
             }
 
-            const requestUrl = `${this.baseUrl}?id=${id}`;
-            console.log(`[NapGame247][${new Date().toISOString()}] Request: GET ${requestUrl}`);
+            const fullUrl = `${this.baseUrl}?api_key=${apiKey}&id=${id}`;
+            console.log(`[NapGame247] Request: GET ${this.baseUrl}?id=${id}`);
+            console.log(`[NapGame247] API Key (first 20 chars): ${apiKey.substring(0, 20)}...`);
 
             const response = await axios.get(this.baseUrl, {
                 params: {
@@ -31,12 +32,18 @@ class NapGame247Service {
                 }
             });
 
-            console.log(`[NapGame247][${new Date().toISOString()}] Response:`, JSON.stringify(response.data).substring(0, 500) + '...');
+            console.log(`[NapGame247] Response OK:`, JSON.stringify(response.data).substring(0, 200) + '...');
 
             return response.data;
         } catch (error) {
-            console.error(`[NapGame247][${new Date().toISOString()}] Error fetching products:`, error.response?.data || error.message);
-            console.error(`[NapGame247] Full error:`, error.response?.status, error.response?.statusText);
+            console.error(`[NapGame247] ========== ERROR DETAILS ==========`);
+            console.error(`[NapGame247] Status: ${error.response?.status} ${error.response?.statusText}`);
+            console.error(`[NapGame247] Response Data:`, JSON.stringify(error.response?.data));
+            console.error(`[NapGame247] Response Headers:`, JSON.stringify(error.response?.headers));
+            console.error(`[NapGame247] Request URL:`, error.config?.url);
+            console.error(`[NapGame247] Request Params:`, JSON.stringify(error.config?.params));
+            console.error(`[NapGame247] Error Message:`, error.message);
+            console.error(`[NapGame247] ===================================`);
             return null;
         }
     }
