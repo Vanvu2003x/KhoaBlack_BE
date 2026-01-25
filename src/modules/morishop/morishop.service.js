@@ -1,4 +1,8 @@
 const axios = require('axios');
+const crypto = require('crypto');
+const { db } = require('../../configs/drizzle');
+const { games, topupPackages } = require('../../db/schema');
+const { eq, and } = require('drizzle-orm');
 
 class MorishopService {
     constructor() {
@@ -62,6 +66,162 @@ class MorishopService {
      */
     async checkStatus(orderId) {
         return await this.makeRequest('/status', { order_id: orderId });
+    }
+
+    /**
+     * Sync specific games from Morishop API to database
+     * @param {string[]} allowedGameNames - List of game names to sync
+     */
+    async syncGames(allowedGameNames = []) {
+        console.log('[Morishop] Starting game sync...');
+        console.log('[Morishop] Allowed games:', allowedGameNames);
+
+        const response = await this.getServices();
+
+        if (!response || !response.status || !response.data) {
+            console.error('[Morishop] Failed to fetch services:', response?.msg);
+            return;
+        }
+
+        // Morishop returns: { status: true, data: [{ game: "Game Name", layanan: [...] }] }
+        const allServices = response.data;
+        console.log(`[Morishop] Found ${allServices.length} games in API`);
+
+        for (const gameData of allServices) {
+            const gameName = gameData.game;
+
+            // Skip if not in allowed list
+            if (!allowedGameNames.includes(gameName)) {
+                continue;
+            }
+
+            console.log(`[Morishop] Syncing Game: ${gameName}`);
+
+            // Check if game exists
+            let [existingGame] = await db.select().from(games).where(eq(games.name, gameName));
+
+            if (!existingGame) {
+                // Create new game
+                console.log(`[Morishop] Creating Game: ${gameName}`);
+                const newGameId = crypto.randomUUID();
+                const gamecode = gameName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now();
+
+                await db.insert(games).values({
+                    id: newGameId,
+                    api_source: 'morishop',
+                    name: gameName,
+                    gamecode: gamecode,
+                    thumbnail: '/uploads/default-game.png',
+                    publisher: 'Morishop',
+                    input_fields: [{ id: 'target', name: 'User ID', type: 'text' }] // Morishop uses single target field
+                });
+
+                [existingGame] = await db.select().from(games).where(eq(games.id, newGameId));
+            } else {
+                // Update existing game
+                await db.update(games)
+                    .set({
+                        api_source: 'morishop',
+                        input_fields: [{ id: 'target', name: 'User ID', type: 'text' }]
+                    })
+                    .where(eq(games.id, existingGame.id));
+            }
+
+            // Sync packages (layanan)
+            const packages = gameData.layanan || [];
+            console.log(`[Morishop] Found ${packages.length} packages for ${gameName}`);
+
+            for (const pkg of packages) {
+                // pkg structure: { layanan: "service_id", name: "Package Name", harga: 1000 }
+                const serviceId = pkg.layanan;
+                const packageName = pkg.name;
+                const originPrice = pkg.harga;
+
+                // Check if package exists
+                const [existingPackage] = await db.select().from(topupPackages).where(
+                    and(
+                        eq(topupPackages.game_id, existingGame.id),
+                        eq(topupPackages.package_name, packageName)
+                    )
+                );
+
+                // Get game profit percentages
+                const percentBasic = existingGame.profit_percent_basic || 0;
+                const percentPro = existingGame.profit_percent_pro || 0;
+                const percentPlus = existingGame.profit_percent_plus || 0;
+
+                // Calculate selling prices
+                const priceBasic = Math.ceil(originPrice * (1 + percentBasic / 100));
+                const pricePro = Math.ceil(originPrice * (1 + percentPro / 100));
+                const pricePlus = Math.ceil(originPrice * (1 + percentPlus / 100));
+
+                if (existingPackage) {
+                    // Update package
+                    console.log(`[Morishop] Updating package: ${packageName} - Origin: ${originPrice}`);
+
+                    await db.update(topupPackages)
+                        .set({
+                            origin_price: originPrice,
+                            price: priceBasic,
+                            price_basic: priceBasic,
+                            price_pro: pricePro,
+                            price_plus: pricePlus,
+                            fileAPI: { service_id: serviceId, api_source: 'morishop' },
+                            profit_percent_basic: percentBasic,
+                            profit_percent_pro: percentPro,
+                            profit_percent_plus: percentPlus
+                        })
+                        .where(eq(topupPackages.id, existingPackage.id));
+                } else {
+                    // Create new package
+                    console.log(`[Morishop] Creating package: ${packageName}`);
+
+                    await db.insert(topupPackages).values({
+                        id: crypto.randomUUID(),
+                        game_id: existingGame.id,
+                        package_name: packageName,
+                        origin_price: originPrice,
+                        price: priceBasic,
+                        price_basic: priceBasic,
+                        price_pro: pricePro,
+                        price_plus: pricePlus,
+                        profit_percent_basic: percentBasic,
+                        profit_percent_pro: percentPro,
+                        profit_percent_plus: percentPlus,
+                        status: 'active',
+                        package_type: 'uid',
+                        thumbnail: '/uploads/default-package.png',
+                        fileAPI: { service_id: serviceId, api_source: 'morishop' }
+                    });
+                }
+            }
+        }
+
+        console.log('[Morishop] Game sync completed.');
+    }
+
+    /**
+     * Forward order to Morishop API
+     * @param {string} serviceId - The service_id from fileAPI
+     * @param {string} target - User ID/target from account_info
+     * @param {string} [idtrx] - Optional internal transaction ID
+     */
+    async buyItem(serviceId, target, idtrx = null) {
+        console.log(`[Morishop] Forwarding order: service=${serviceId}, target=${target}`);
+
+        const orderData = {
+            service_id: serviceId,
+            target: target
+        };
+
+        if (idtrx) {
+            orderData.idtrx = idtrx;
+        }
+
+        const result = await this.createOrder(orderData);
+        console.log('[Morishop] Order result:', result);
+
+        return result;
     }
 }
 

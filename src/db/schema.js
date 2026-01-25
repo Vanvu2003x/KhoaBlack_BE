@@ -29,6 +29,7 @@ const users = mysqlTable('users', {
 const games = mysqlTable('games', {
     id: varchar('id', { length: 36 }).primaryKey(), // UUID
     api_id: int('api_id'), // ID from external API/Cron
+    api_source: varchar('api_source', { length: 50 }), // 'napgame247', 'morishop'
     name: varchar('name', { length: 50 }).notNull(),
     thumbnail: varchar('thumbnail', { length: 500 }),
     server: json('server'), // Array of servers

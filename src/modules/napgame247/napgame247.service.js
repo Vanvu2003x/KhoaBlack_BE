@@ -169,6 +169,7 @@ class NapGame247Service {
             await db.insert(games).values({
                 id: newGameId,
                 api_id: targetGameData.id,
+                api_source: 'napgame247',
                 name: targetGameData.name,
                 gamecode: Date.now().toString(), // Improved slug generation needed, but using unique for now
                 thumbnail: '/uploads/default-game.png',
@@ -182,6 +183,7 @@ class NapGame247Service {
             await db.update(games)
                 .set({
                     api_id: targetGameData.id,
+                    api_source: 'napgame247',
                     server: serverList,
                     input_fields: inputFields
                 })
