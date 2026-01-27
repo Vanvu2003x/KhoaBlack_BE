@@ -4,8 +4,8 @@ const toolsGameService = require('../modules/toolsgame/toolsgame.service');
 const initCronJobs = () => {
     console.log('Initializing Cron Jobs...');
 
-    // 1. Check Order Statuses (Frequent - Every 2 minutes)
-    cron.schedule('*/2 * * * *', async () => {
+    // 1. Check Order Statuses (Less Frequent - Every 20 minutes)
+    cron.schedule('*/20 * * * *', async () => {
         console.log('Triggering: Check Pending Orders');
         await toolsGameService.checkPendingOrders();
     });

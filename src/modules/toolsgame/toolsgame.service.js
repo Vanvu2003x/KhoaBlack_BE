@@ -78,10 +78,12 @@ class ToolsGameService {
 
             console.log(`Found ${pendingOrders.length} pending orders to check.`);
 
-            // Parallel Processing using Promise.all
-            // Limit concurrency if needed, but for < 100 orders, Promise.all is fine.
-            const checkPromises = pendingOrders.map(order => this.processSingleOrder(order));
-            await Promise.all(checkPromises);
+            // Parallel Processing using Promise.all - DISABLED for performance
+            // Limit concurrency if needed, but for < 100 orders, Promise.all calls API simultaneously, potentially causing lag
+            // Use sequential processing instead
+            for (const order of pendingOrders) {
+                await this.processSingleOrder(order);
+            }
 
             console.log(`[${new Date().toISOString()}] Check Pending Orders completed.`);
         } catch (error) {

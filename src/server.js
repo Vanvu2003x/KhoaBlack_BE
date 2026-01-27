@@ -52,7 +52,7 @@ server.listen(PORT, () => {
 const WalletLogService = require("./modules/walletLog/walletLog.service");
 setInterval(() => {
   WalletLogService.autoCheckExpiredTransactions();
-}, 60 * 1000); // Check every 60 seconds
+}, 20 * 60 * 1000); // Check every 20 minutes
 
 // ✅ Initialize Cron Jobs
 const { initCronJobs } = require('./services/cron.service');
