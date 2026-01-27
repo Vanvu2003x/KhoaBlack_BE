@@ -31,6 +31,7 @@ const GameService = {
             profit_percent_basic: data.profit_percent_basic || 0,
             profit_percent_pro: data.profit_percent_pro || 0,
             profit_percent_plus: data.profit_percent_plus || 0,
+            origin_markup_percent: data.origin_markup_percent !== undefined ? Number(data.origin_markup_percent) : 0,
         };
 
         await db.insert(games).values(newGame);
@@ -57,6 +58,8 @@ const GameService = {
         if (data.profit_percent_plus !== undefined) { updateData.profit_percent_plus = Number(data.profit_percent_plus); profitChanged = true; }
 
 
+        if (data.origin_markup_percent !== undefined) { updateData.origin_markup_percent = Number(data.origin_markup_percent); profitChanged = true; }
+
         if (Object.keys(updateData).length === 0) {
             throw new Error("Không có trường nào để cập nhật.");
         }
@@ -67,23 +70,25 @@ const GameService = {
                 .set(updateData)
                 .where(eq(games.id, id));
 
-            // If Profits Changed, Trigger Cascade Update for Packages
+            // If Profits or Markup Changed, Trigger Cascade Update for Packages
             if (profitChanged) {
-                // 1. Get current game percentages (merge updateData with existing to be safe, but we have updateData)
-                // Need to fetch full game first if we update partial percentages? 
-                // Let's assume frontend sends all valid percentages or we fetch.
+                // 1. Get current game config
                 const [game] = await tx.select().from(games).where(eq(games.id, id));
 
                 const percentBasic = game.profit_percent_basic || 0;
                 const percentPro = game.profit_percent_pro || 0;
                 const percentPlus = game.profit_percent_plus || 0;
+                const originMarkup = (game.origin_markup_percent && game.origin_markup_percent > 0) ? game.origin_markup_percent : 1;
 
                 // 2. Fetch all packages
                 const packages = await tx.select().from(topupPackages).where(eq(topupPackages.game_id, id));
 
                 // 3. Update each package
                 for (const pkg of packages) {
-                    const originPrice = pkg.origin_price || 0;
+                    const apiPrice = pkg.api_price || 0;
+
+                    // Recalculate Origin Price based on new coefficient
+                    const originPrice = Math.ceil(apiPrice * originMarkup);
 
                     const priceBasic = Math.ceil(originPrice * (1 + percentBasic / 100));
                     const pricePro = Math.ceil(originPrice * (1 + percentPro / 100));
@@ -91,11 +96,12 @@ const GameService = {
 
                     await tx.update(topupPackages)
                         .set({
+                            origin_price: originPrice, // Update origin price
                             price: priceBasic, // Default price
                             price_basic: priceBasic,
                             price_pro: pricePro,
                             price_plus: pricePlus,
-                            profit_percent_basic: percentBasic, // Sync package columns too? Maybe yes for consistency
+                            profit_percent_basic: percentBasic,
                             profit_percent_pro: percentPro,
                             profit_percent_plus: percentPlus
                         })

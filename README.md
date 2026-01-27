@@ -1,23 +1,108 @@
 # Tài Liệu API
 
-## Cấu Hình Socket.IO
+## 🚀 Hướng Dẫn Deploy lên VPS
 
-Backend sử dụng Socket.IO để giao tiếp realtime với Frontend. Cấu hình trong file `.env`:
+### 1. Cấu hình Environment Variables
+
+Tạo file `.env` trên VPS với nội dung:
 
 ```env
-# Socket.IO CORS Configuration
-# Danh sách các origin được phép kết nối (phân cách bằng dấu phẩy)
-# Trong development, để trống hoặc không set để cho phép tất cả
-# Trong production, set các URL frontend của bạn:
-SOCKET_ORIGINS=http://localhost:3000,https://khoablacktopup.vn
+# ⚠️ QUAN TRỌNG: Server Configuration
+NODE_ENV=production
+PORT=5000
 
-# Frontend URL (fallback cho Socket CORS trong production)
-FRONTEND_URL=http://localhost:3000
+# Database
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=your_db_user
+DB_PASSWORD=YOUR_STRONG_PASSWORD
+DB_NAME=khoablack
+
+# JWT - ĐỔI SECRET KEY!
+JWT_SECRET_KEY=YOUR_SUPER_SECRET_KEY_CHANGE_THIS
+JWT_EXPIRY=7d
+
+# Redis (optional)
+REDIS_HOST=localhost
+REDIS_PORT=6379
+
+# ⚠️ CORS - BẮT BUỘC CHO SOCKET.IO
+CORS_ORIGINS=https://khoablacktopup.vn,https://www.khoablacktopup.vn
+SOCKET_ORIGINS=https://khoablacktopup.vn,https://www.khoablacktopup.vn
+FRONTEND_URL=https://khoablacktopup.vn
+
+# API Keys
+MORISHOP_API_KEY=your_morishop_key
+NAPGAME247_API_KEY=your_napgame247_key
 ```
 
-**Lưu ý:** 
-- Nếu không set `SOCKET_ORIGINS`, backend sẽ cho phép tất cả origin trong development
-- Trong production với `NODE_ENV=production`, backend sẽ sử dụng `FRONTEND_URL` làm fallback
+### 2. Cấu hình Nginx (WebSocket Support)
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name api.khoablacktopup.vn;
+
+    ssl_certificate /path/to/fullchain.pem;
+    ssl_certificate_key /path/to/privkey.pem;
+
+    # API thông thường
+    location / {
+        proxy_pass http://localhost:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # ⚠️ Socket.IO - BẮT BUỘC
+    location /socket.io/ {
+        proxy_pass http://localhost:5000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_cache_bypass $http_upgrade;
+        proxy_read_timeout 86400s;
+    }
+}
+```
+
+### 3. Khởi chạy với PM2
+
+```bash
+# Install dependencies
+npm install
+
+# Start với PM2
+pm2 start src/server.js --name khoablack-be
+
+# Kiểm tra logs
+pm2 logs khoablack-be --lines 30
+```
+
+### ⚠️ Lưu ý quan trọng
+
+| Điểm | Chi tiết |
+|------|----------|
+| **NODE_ENV** | Phải set `production` |
+| **CORS matching** | `CORS_ORIGINS` và `SOCKET_ORIGINS` phải chứa chính xác domain frontend |
+| **HTTPS** | Cả frontend và backend phải dùng HTTPS |
+| **Không trailing slash** | ✅ `https://khoablacktopup.vn` ❌ `https://khoablacktopup.vn/` |
+| **www variant** | Thêm cả `www.` và non-www vào CORS |
+| **Secret keys** | Đổi tất cả keys, không dùng mặc định |
+| **File permissions** | `.env` chỉ đọc bởi owner: `chmod 600 .env` |
+
+### ✅ Verify Socket hoạt động
+
+Kiểm tra log khi server start:
+```
+🔧 NODE_ENV: production
+🔧 SOCKET_ORIGINS từ env: [ 'https://khoablacktopup.vn', 'https://www.khoablacktopup.vn' ]
+🔌 Socket.IO allowed origins: [ 'https://khoablacktopup.vn', 'https://www.khoablacktopup.vn' ]
+```
 
 ---
 

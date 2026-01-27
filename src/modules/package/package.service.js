@@ -24,6 +24,7 @@ const PackageService = {
             price_basic: topupPackages.price_basic,
             price_pro: topupPackages.price_pro,
             price_plus: topupPackages.price_plus,
+            profit_percent_user: topupPackages.profit_percent_user,
             thumbnail: topupPackages.thumbnail,
             package_type: topupPackages.package_type,
             status: topupPackages.status,
@@ -72,13 +73,24 @@ const PackageService = {
         const originPrice = parseInt(data.origin_price || 0);
 
         // USE GAME PERCENTAGES (Master Rule)
-        const percentBasic = game.profit_percent_basic || 0;
-        const percentPro = game.profit_percent_pro || 0;
-        const percentPlus = game.profit_percent_plus || 0;
+        // USE PACKAGE PERCENTAGES IF PROVIDED, ELSE GAME DEFAULTS
+        const percentBasic = data.profit_percent_basic !== undefined ? Number(data.profit_percent_basic) : (game.profit_percent_basic || 0);
+        const percentPro = data.profit_percent_pro !== undefined ? Number(data.profit_percent_pro) : (game.profit_percent_pro || 0);
+        const percentPlus = data.profit_percent_plus !== undefined ? Number(data.profit_percent_plus) : (game.profit_percent_plus || 0);
+        const percentUser = data.profit_percent_user !== undefined ? Number(data.profit_percent_user) : 0;
 
         const priceBasic = Math.ceil(originPrice * (1 + percentBasic / 100));
         const pricePro = Math.ceil(originPrice * (1 + percentPro / 100));
         const pricePlus = Math.ceil(originPrice * (1 + percentPlus / 100));
+        // Default price is often User Price or Basic Price. Let's assume Price = User Price if defined, else Basic.
+        // But usually 'price' column is the default display price.
+        // If we have a specific user percentage, maybe we should calculate a price for it?
+        // Let's assume price = origin * (1 + percentUser/100) if percentUser is set, otherwise use basic.
+        // Or just save it.
+        // The user request is "not saving % user". So we definitely need to save it.
+        // Does it affect the main 'price'?
+        // "Price" column seems to be the one shown to normal users.
+        const priceUser = Math.ceil(originPrice * (1 + percentUser / 100));
 
         const newPackage = {
             id: crypto.randomUUID(),
@@ -90,8 +102,9 @@ const PackageService = {
             profit_percent_basic: percentBasic,
             profit_percent_pro: percentPro,
             profit_percent_plus: percentPlus,
+            profit_percent_user: percentUser,
 
-            price: priceBasic, // Default to basic price
+            price: priceUser > originPrice ? priceUser : priceBasic, // Default price logic: Use User price if valid calculation, else Basic
             price_basic: priceBasic,
             price_pro: pricePro,
             price_plus: pricePlus,
@@ -134,21 +147,31 @@ const PackageService = {
         // Pricing Logic
         const originPrice = data.origin_price !== undefined ? parseInt(data.origin_price) : currentPkg.origin_price;
 
-        const percentBasic = game.profit_percent_basic || 0;
-        const percentPro = game.profit_percent_pro || 0;
-        const percentPlus = game.profit_percent_plus || 0;
+        const percentBasic = data.profit_percent_basic !== undefined ? Number(data.profit_percent_basic)
+            : (currentPkg.profit_percent_basic !== null ? currentPkg.profit_percent_basic : (game.profit_percent_basic || 0));
+
+        const percentPro = data.profit_percent_pro !== undefined ? Number(data.profit_percent_pro)
+            : (currentPkg.profit_percent_pro !== null ? currentPkg.profit_percent_pro : (game.profit_percent_pro || 0));
+
+        const percentPlus = data.profit_percent_plus !== undefined ? Number(data.profit_percent_plus)
+            : (currentPkg.profit_percent_plus !== null ? currentPkg.profit_percent_plus : (game.profit_percent_plus || 0));
+
+        const percentUser = data.profit_percent_user !== undefined ? Number(data.profit_percent_user)
+            : (currentPkg.profit_percent_user !== null ? currentPkg.profit_percent_user : 0);
 
         // Update stored values to match Game
         updateData.origin_price = originPrice;
         updateData.profit_percent_basic = percentBasic;
         updateData.profit_percent_pro = percentPro;
         updateData.profit_percent_plus = percentPlus;
+        updateData.profit_percent_user = percentUser;
 
         // Recalculate Prices
         updateData.price_basic = Math.ceil(originPrice * (1 + percentBasic / 100));
         updateData.price_pro = Math.ceil(originPrice * (1 + percentPro / 100));
         updateData.price_plus = Math.ceil(originPrice * (1 + percentPlus / 100));
-        updateData.price = updateData.price_basic; // Update default price
+        const priceUser = Math.ceil(originPrice * (1 + percentUser / 100));
+        updateData.price = priceUser > originPrice ? priceUser : updateData.price_basic;
 
         // Thumbnail
         if (data.thumbnail !== undefined) updateData.thumbnail = data.thumbnail;

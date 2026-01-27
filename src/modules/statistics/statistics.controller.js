@@ -1,3 +1,4 @@
+
 const { db } = require("../../configs/drizzle");
 const { users, orders, topupPackages, games, walletLogs } = require('../../db/schema');
 const { desc, sum, count, eq, sql } = require('drizzle-orm');
@@ -38,7 +39,7 @@ const StatisticsController = {
     getBestSellers: async (req, res) => {
         try {
             // Count orders per package, verify status 'success'
-            const bestSellers = await db
+            let bestSellers = await db
                 .select({
                     package_name: topupPackages.package_name,
                     game_name: games.name,
@@ -48,12 +49,32 @@ const StatisticsController = {
                     sold_count: count(orders.id).as('sold_count')
                 })
                 .from(orders)
-                .innerJoin(topupPackages, eq(orders.package_id, topupPackages.id))
-                .innerJoin(games, eq(topupPackages.game_id, games.id))
+                .leftJoin(topupPackages, eq(orders.package_id, topupPackages.id))
+                .leftJoin(games, eq(topupPackages.game_id, games.id))
                 .where(eq(orders.status, 'success'))
                 .groupBy(topupPackages.id)
                 .orderBy(desc(sql`sold_count`))
                 .limit(5);
+
+            console.log("[Statistics] Best Sellers count:", bestSellers.length);
+
+            // Fallback: If no best sellers, show random active packages
+            if (bestSellers.length === 0) {
+                console.log("[Statistics] No best sellers, fetching fallback packages...");
+                bestSellers = await db
+                    .select({
+                        package_name: topupPackages.package_name,
+                        game_name: games.name,
+                        price: topupPackages.price,
+                        thumbnail: topupPackages.thumbnail,
+                        game_image: games.thumbnail,
+                        sold_count: sql`0`.as('sold_count')
+                    })
+                    .from(topupPackages)
+                    .innerJoin(games, eq(topupPackages.game_id, games.id))
+                    .where(eq(topupPackages.status, 'active'))
+                    .limit(5);
+            }
 
             res.json({
                 status: 'success',

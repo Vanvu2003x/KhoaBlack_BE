@@ -3,9 +3,30 @@ const { db } = require("../configs/drizzle");
 const { users } = require("../db/schema");
 const { eq } = require("drizzle-orm");
 
+// Map: socketId -> userData
 const userSocketMap = new Map();
+// Map: userId -> Set of socketIds (để track multiple tabs/devices)
+const userIdToSockets = new Map();
 
 let _io = null;
+
+// Helper: Track socket by userId
+function trackSocket(socketId, userId) {
+  if (!userIdToSockets.has(userId)) {
+    userIdToSockets.set(userId, new Set());
+  }
+  userIdToSockets.get(userId).add(socketId);
+}
+
+// Helper: Untrack socket when disconnected
+function untrackSocket(socketId, userId) {
+  if (userId && userIdToSockets.has(userId)) {
+    userIdToSockets.get(userId).delete(socketId);
+    if (userIdToSockets.get(userId).size === 0) {
+      userIdToSockets.delete(userId);
+    }
+  }
+}
 
 // Helper: Get fresh balance from database
 async function getFreshBalance(userId) {
@@ -43,9 +64,10 @@ function initSocket(io) {
 
         const userData = { id, balance: freshBalance, email, name };
         userSocketMap.set(socket.id, userData);
+        trackSocket(socket.id, id); // Track này để emit tới user dễ hơn
         socket.user = userData;
         socket.emit("authenticated", userData);
-        console.log(`Socket authenticated via cookie: ${name}, balance: ${freshBalance}`);
+        console.log(`✅ Socket authenticated via cookie: ${name} (userId: ${id}), balance: ${freshBalance}`);
       } else {
         console.log("Invalid token in cookie");
         // Optional: socket.disconnect();
@@ -66,13 +88,19 @@ function initSocket(io) {
 
       const userData = { id, balance: freshBalance, email, name };
       userSocketMap.set(socket.id, userData);
+      trackSocket(socket.id, id);
       socket.user = userData;
       socket.emit("authenticated", userData);
+      console.log(`✅ Socket authenticated via manual auth: ${name} (userId: ${id})`);
     });
 
     socket.on("disconnect", () => {
+      const userData = userSocketMap.get(socket.id);
+      if (userData) {
+        untrackSocket(socket.id, userData.id);
+      }
       userSocketMap.delete(socket.id);
-      console.log(`Socket disconnected: ${socket.id}`);
+      console.log(`🔌 Socket disconnected: ${socket.id}`);
     });
   });
 }

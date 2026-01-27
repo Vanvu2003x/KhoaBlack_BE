@@ -1,8 +1,10 @@
 const { db } = require("../../configs/drizzle");
 const { orders, users, topupPackages, games, walletLogs, balanceHistory } = require("../../db/schema");
-const { eq, ilike, or, and, sql, desc, aliasedTable } = require("drizzle-orm");
+const { eq, like, or, and, sql, desc, aliasedTable } = require("drizzle-orm");
 const UserService = require("../user/user.service");
 const { sendOrderSuccessEmail, sendOrderFailureEmail } = require("../../services/nodemailer.service");
+const { emitToUser } = require("../../sockets/websocket");
+
 
 
 // Helper to construct the base query with joins
@@ -34,8 +36,8 @@ const buildOrderQuery = () => {
             return queryBuilder
                 .innerJoin(users, eq(orders.user_id, users.id))
                 .leftJoin(usersNap, eq(orders.user_id_nap, usersNap.id))
-                .innerJoin(topupPackages, eq(orders.package_id, topupPackages.id))
-                .innerJoin(games, eq(topupPackages.game_id, games.id));
+                .leftJoin(topupPackages, eq(orders.package_id, topupPackages.id))
+                .leftJoin(games, eq(topupPackages.game_id, games.id));
         }
     };
 };
@@ -136,7 +138,6 @@ const OrderService = {
 
             // Emit balance_update for real-time header update
             try {
-                const { emitToUser } = require("../../sockets/websocket");
                 emitToUser(data.user_id, "balance_update", balanceAfter);
             } catch (socketError) {
                 console.error("❌ Failed to emit balance_update:", socketError);
@@ -365,37 +366,41 @@ const OrderService = {
         const limit = 10;
         const offset = (page - 1) * limit;
         const base = buildOrderQuery();
+
+        // We need to re-define aliases to use them in the search condition
+        // However, buildOrderQuery returns a constructed object, not the raw query builder for us to inject 'where'.
+        // So we might need to manually construct the search join similar to buildOrderQuery but exposed for WHERE clause.
+
         const usersNap = aliasedTable(users, "user_nap");
 
         const searchTerm = `%${keyword}%`;
         const searchCondition = or(
-            sql`CAST(${orders.id} AS CHAR) ILIKE ${searchTerm}`,
-            ilike(users.email, searchTerm),
-            ilike(usersNap.email, searchTerm), // Note: Need aliased join for this to work perfectly, handled in buildOrderQuery logic
-            ilike(topupPackages.package_name, searchTerm),
-            ilike(games.name, searchTerm)
+            sql`CAST(${orders.id} AS CHAR) LIKE ${searchTerm}`,
+            like(users.email, searchTerm),
+            like(usersNap.email, searchTerm),
+            like(topupPackages.package_name, searchTerm),
+            like(games.name, searchTerm)
         );
 
-        // Re-construct joins explicitly to access aliases if needed, but buildOrderQuery usage:
-        const query = db.select(base.selection)
+        // Execute Search Data
+        const data = await db.select(base.selection)
             .from(orders)
             .innerJoin(users, eq(orders.user_id, users.id))
             .leftJoin(usersNap, eq(orders.user_id_nap, usersNap.id))
-            .innerJoin(topupPackages, eq(orders.package_id, topupPackages.id))
-            .innerJoin(games, eq(topupPackages.game_id, games.id))
+            .leftJoin(topupPackages, eq(orders.package_id, topupPackages.id))
+            .leftJoin(games, eq(topupPackages.game_id, games.id))
             .where(searchCondition)
             .orderBy(desc(orders.updated_at))
             .limit(limit)
             .offset(offset);
 
-        const data = await query;
-
+        // Execute Search Count
         const [total] = await db.select({ count: sql`COUNT(*)` })
             .from(orders)
             .innerJoin(users, eq(orders.user_id, users.id))
             .leftJoin(usersNap, eq(orders.user_id_nap, usersNap.id))
-            .innerJoin(topupPackages, eq(orders.package_id, topupPackages.id))
-            .innerJoin(games, eq(topupPackages.game_id, games.id))
+            .leftJoin(topupPackages, eq(orders.package_id, topupPackages.id))
+            .leftJoin(games, eq(topupPackages.game_id, games.id))
             .where(searchCondition);
 
         return { orders: data, total: Number(total.count) };
@@ -485,7 +490,6 @@ const OrderService = {
 
         // Send socket notification (real-time)
         try {
-            const { emitToUser } = require("../../sockets/websocket");
             emitToUser(updatedOrder.user_id, "order_status_update", {
                 orderId: id,
                 status: "success",
@@ -520,7 +524,6 @@ const OrderService = {
 
         // Send socket notification (real-time)
         try {
-            const { emitToUser } = require("../../sockets/websocket");
             emitToUser(order.user_id, "order_status_update", {
                 orderId: id,
                 status: "cancelled",

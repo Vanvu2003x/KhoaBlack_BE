@@ -213,14 +213,14 @@ class NapGame247Service {
             );
 
             // Get game markup and profit percentages
-            const originMarkup = existingGame.origin_markup_percent || 0;
+            const originMarkup = (existingGame.origin_markup_percent && existingGame.origin_markup_percent > 0) ? existingGame.origin_markup_percent : 1;
             const percentBasic = existingGame.profit_percent_basic || 0;
             const percentPro = existingGame.profit_percent_pro || 0;
             const percentPlus = existingGame.profit_percent_plus || 0;
 
             // Step 1: Calculate origin price from API price
             const apiPrice = item.price;
-            const originPrice = Math.ceil(apiPrice * (1 + originMarkup / 100));
+            const originPrice = Math.ceil(apiPrice * originMarkup);
 
             // Step 2: Calculate selling prices from origin price
             const priceBasic = Math.ceil(originPrice * (1 + percentBasic / 100));

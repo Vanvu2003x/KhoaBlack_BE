@@ -11,15 +11,22 @@ const server = http.createServer(app);
 const getAllowedOrigins = () => {
   const originsEnv = process.env.SOCKET_ORIGINS;
   if (originsEnv) {
-    return originsEnv.split(',').map(o => o.trim());
+    const origins = originsEnv.split(',').map(o => o.trim()).filter(Boolean);
+    console.log("🔧 SOCKET_ORIGINS từ env:", origins);
+    return origins;
   }
   // Fallback: allow all in development, or use FRONTEND_URL if set
-  if (process.env.NODE_ENV === 'production' && process.env.FRONTEND_URL) {
-    return [process.env.FRONTEND_URL];
+  if (process.env.NODE_ENV === 'production') {
+    if (process.env.FRONTEND_URL) {
+      console.log("🔧 Sử dụng FRONTEND_URL làm socket origin:", process.env.FRONTEND_URL);
+      return [process.env.FRONTEND_URL];
+    }
+    console.warn("⚠️ Production mode nhưng không có SOCKET_ORIGINS hoặc FRONTEND_URL!");
   }
   return true; // Allow all origins in development
 };
 
+console.log("🔧 NODE_ENV:", process.env.NODE_ENV || "development");
 const allowedOrigins = getAllowedOrigins();
 console.log("🔌 Socket.IO allowed origins:", allowedOrigins);
 

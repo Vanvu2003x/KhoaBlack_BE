@@ -7,7 +7,7 @@ const ToolsGameController = {
         // Since it's a manual trigger, user likely wants to know when it finishes or if it started.
         // syncIdentityV is async. Let's await it to return success/fail result.
 
-        await toolsGameService.runScheduledTask();
+        await toolsGameService.syncData();
 
         return res.status(200).json({
             status: "success",

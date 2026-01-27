@@ -13,12 +13,16 @@ const PackageController = {
     }),
 
     createTopupPackage: asyncHandler(async (req, res) => {
+        console.log("Create Pkg Body:", req.body);
         const result = await PackageService.createPackage(req.body, req.file);
         res.status(201).json(result);
     }),
 
     updateTopupPackage: asyncHandler(async (req, res) => {
+        console.log("Update Pkg Body:", req.body);
+        console.log("Update Pkg ID:", req.query.id);
         const result = await PackageService.updatePackage(req.query.id, req.body, req.file);
+        console.log("Update Result:", result);
         res.json(result);
     }),
 
