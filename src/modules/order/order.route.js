@@ -2,10 +2,11 @@ const express = require('express');
 const router = express.Router();
 const OrderController = require('./order.controller');
 const { checkToken } = require('../../middleware/auJWT.middleware');
+const { orderLimiter } = require('../../middleware/rateLimit.middleware');
 
 // Public/User routes
 // Public/User routes
-router.post('/', checkToken, OrderController.createOrder); // FE: api.post("/api/order")
+router.post('/', orderLimiter, checkToken, OrderController.createOrder); // FE: api.post("/api/order")
 router.get('/my-orders', checkToken, OrderController.getOrdersByUserId); // Might duplicate /user?
 router.get('/user', checkToken, OrderController.getOrdersByUserId); // FE: /api/order/user
 router.put('/:id/cancel', checkToken, OrderController.cancelOrderIfPending); // FE: /api/order/${id}/cancel

@@ -1,7 +1,11 @@
 const { db } = require("../../configs/drizzle");
 const { orders, users, topupPackages, games, walletLogs, balanceHistory } = require("../../db/schema");
-const { eq, ilike, or, and, sql, desc, aliasedTable } = require("drizzle-orm");
+const { eq, like, or, and, sql, desc, aliasedTable } = require("drizzle-orm");
 const UserService = require("../user/user.service");
+const { sendOrderSuccessEmail, sendOrderFailureEmail } = require("../../services/nodemailer.service");
+const { emitToUser } = require("../../sockets/websocket");
+
+
 
 // Helper to construct the base query with joins
 const buildOrderQuery = () => {
@@ -32,15 +36,20 @@ const buildOrderQuery = () => {
             return queryBuilder
                 .innerJoin(users, eq(orders.user_id, users.id))
                 .leftJoin(usersNap, eq(orders.user_id_nap, usersNap.id))
-                .innerJoin(topupPackages, eq(orders.package_id, topupPackages.id))
-                .innerJoin(games, eq(topupPackages.game_id, games.id));
+                .leftJoin(topupPackages, eq(orders.package_id, topupPackages.id))
+                .leftJoin(games, eq(topupPackages.game_id, games.id));
         }
     };
 };
 
 const OrderService = {
     createOrder: async (data) => {
-        return await db.transaction(async (tx) => {
+        console.log(`[OrderService] Processing createOrder for User ${data.user_id}`);
+        let createdOrder = null;
+        let packageDetails = null;
+        const qty = data.quantity || 1;
+
+        await db.transaction(async (tx) => {
             // 1. Fetch User (Balance & Level)
             const [user] = await tx.select({
                 id: users.id,
@@ -49,6 +58,7 @@ const OrderService = {
             }).from(users).where(eq(users.id, data.user_id));
 
             if (!user) {
+                console.error(`[OrderService] User ${data.user_id} not found.`);
                 throw { status: 404, message: 'Người dùng không tồn tại' };
             }
 
@@ -63,30 +73,39 @@ const OrderService = {
                     price_pro: topupPackages.price_pro,
                     price_plus: topupPackages.price_plus,
                     game_name: games.name,
-                    game_code: games.gamecode
+                    game_code: games.gamecode,
+                    game_id: games.id,
+                    fileAPI: topupPackages.fileAPI, // Fetch fileAPI to get external ID
+                    input_fields: games.input_fields // Fetch input mapping config
                 })
                 .from(topupPackages)
                 .innerJoin(games, eq(topupPackages.game_id, games.id))
                 .where(eq(topupPackages.id, data.package_id));
 
             if (!packageInfo) {
+                console.error(`[OrderService] Package ${data.package_id} not found.`);
                 throw { status: 404, message: 'Gói nạp không tồn tại' };
             }
 
+            console.log(`[OrderService] Package Found: ${packageInfo.package_name} (Game: ${packageInfo.game_name})`);
+            packageDetails = packageInfo;
+
             // 3. Calculate Valid Price
-            let finalPrice = packageInfo.price; // Default
+            let unitPrice = packageInfo.price; // Default
             const level = user.level || 1;
 
-            if (level === 2 && packageInfo.price_pro) finalPrice = packageInfo.price_pro;
-            if (level === 3 && packageInfo.price_plus) finalPrice = packageInfo.price_plus;
+            if (level === 2 && packageInfo.price_pro) unitPrice = packageInfo.price_pro;
+            if (level === 3 && packageInfo.price_plus) unitPrice = packageInfo.price_plus;
 
             // Allow Basic override if set (unlikely but safe)
-            if (level === 1 && packageInfo.price_basic) finalPrice = packageInfo.price_basic;
+            if (level === 1 && packageInfo.price_basic) unitPrice = packageInfo.price_basic;
 
+            const finalPrice = unitPrice * qty;
 
             // 4. Validate Balance
             if (Number(user.balance) < finalPrice) {
                 const missing = finalPrice - Number(user.balance);
+                console.warn(`[OrderService] Insufficient Balance. User: ${user.balance}, Need: ${finalPrice}`);
                 throw {
                     status: 400,
                     message: `Số dư không đủ! Hiện có: ${Number(user.balance).toLocaleString('vi-VN')}đ. Cần: ${finalPrice.toLocaleString('vi-VN')}đ. Thiếu: ${missing.toLocaleString('vi-VN')}đ. Vui lòng nạp thêm!`
@@ -95,10 +114,10 @@ const OrderService = {
 
             // 5. Calculate Profit
             // Profit = Selling Price - Origin Price
-            const originPrice = packageInfo.origin_price || 0;
+            const originPrice = (packageInfo.origin_price || 0) * qty;
             const finalProfit = finalPrice - originPrice;
 
-            const description = `Thanh toán gói ${packageInfo.package_name} - ${packageInfo.game_name}`;
+            const description = `Thanh toán gói ${packageInfo.package_name} - ${packageInfo.game_name} (x${qty})`;
 
             // 6. Deduct Balance
             const balanceBefore = Number(user.balance);
@@ -117,6 +136,13 @@ const OrderService = {
                 description: description
             });
 
+            // Emit balance_update for real-time header update
+            try {
+                emitToUser(data.user_id, "balance_update", balanceAfter);
+            } catch (socketError) {
+                console.error("❌ Failed to emit balance_update:", socketError);
+            }
+
             // 7. Create Order
             const newOrder = {
                 user_id: data.user_id,
@@ -124,15 +150,149 @@ const OrderService = {
                 account_info: data.account_info,
                 amount: finalPrice, // Secure Price
                 profit: finalProfit, // Secure Profit
-                status: 'pending'
+                quantity: qty,
+                status: 'pending' // Default pending, will trigger forwarding
             };
 
-            const [result] = await tx.insert(orders).values(newOrder);
+            await tx.insert(orders).values(newOrder);
 
             // Fetch created order (Assuming result might not provide full row in all drivers, reusing safe fetch)
             const [created] = await tx.select().from(orders).orderBy(desc(orders.id)).limit(1);
-            return created;
+            createdOrder = created;
+            console.log(`[OrderService] Order Created Successfully. Order ID: ${createdOrder.id}`);
         });
+
+        // Post-Transaction: Forward to NapGame247
+        if (createdOrder && packageDetails) {
+            console.log("[OrderService] Triggering API forwarding check...");
+            const NapGame247Service = require("../napgame247/napgame247.service");
+            const MorishopService = require("../morishop/morishop.service");
+
+            // Determine External IDs and Map Fields
+            try {
+                // Get fresh IDs just in case
+                const { topupPackages, games } = require("../../db/schema");
+                const [pkg] = await db.select().from(topupPackages).where(eq(topupPackages.id, data.package_id));
+                const [game] = await db.select().from(games).where(eq(games.id, pkg.game_id));
+
+                const apiSource = game?.api_source; // 'napgame247' or 'morishop'
+                const fileAPI = pkg?.fileAPI || {};
+
+                console.log(`[OrderService] API Source: ${apiSource}`);
+
+                // Parse account_info
+                let accountInfo = data.account_info;
+                if (typeof accountInfo === 'string') {
+                    try {
+                        accountInfo = JSON.parse(accountInfo);
+                    } catch (e) {
+                        console.error("[OrderService] Failed to parse account_info JSON:", e);
+                        accountInfo = {};
+                    }
+                } else {
+                    accountInfo = accountInfo || {};
+                }
+
+                console.log(`[OrderService] Parsed Account Info:`, JSON.stringify(accountInfo));
+
+                // Route to correct API
+                if (apiSource === 'morishop') {
+                    // === MORISHOP FORWARD ===
+                    const serviceId = fileAPI.service_id;
+                    const userId = accountInfo.user_id || accountInfo.uid || accountInfo.id;
+                    const serverId = accountInfo.server_id || accountInfo.server || '';
+
+                    if (serviceId && userId) {
+                        console.log(`[OrderService] Forwarding to Morishop: service=${serviceId}, userId=${userId}, serverId=${serverId}`);
+
+                        MorishopService.buyItem(serviceId, userId, serverId, createdOrder.id.toString()).then(async (res) => {
+                            console.log("[OrderService] Morishop Result:", JSON.stringify(res));
+
+                            // Morishop returns { status: true, data: { id: "ORDER...", status: "pending" } }
+                            if (res && res.status === true && res.data && res.data.id) {
+                                await db.update(orders)
+                                    .set({
+                                        api_id: res.data.id, // Morishop returns id, not order_id
+                                        status: 'processing',
+                                        updated_at: new Date()
+                                    })
+                                    .where(eq(orders.id, createdOrder.id));
+
+                                console.log(`[OrderService] Order #${createdOrder.id} LINKED to Morishop. External ID: ${res.data.id}`);
+                            } else {
+                                console.error(`[OrderService] Order #${createdOrder.id} Morishop Forward Failed:`, res?.msg || "Unknown error");
+                            }
+                        }).catch(err => console.error("[OrderService] Morishop Call Exception:", err));
+                    } else {
+                        console.log("[OrderService] Skip Morishop: Missing service_id or user_id");
+                    }
+
+                } else if (apiSource === 'napgame247' || game?.api_id) {
+                    // === NAPGAME247 FORWARD ===
+                    const extGameId = game?.api_id;
+                    const extPkgId = pkg?.api_id;
+                    const inputFields = game?.input_fields || [];
+
+                    console.log(`[OrderService] External Mapping -> Game ExtID: ${extGameId}, Package ExtID: ${extPkgId}`);
+
+                    if (extGameId && extPkgId) {
+                        console.log(`[OrderService] Input Fields Config:`, JSON.stringify(inputFields));
+
+                        const dynamicParams = {};
+
+                        if (Array.isArray(inputFields)) {
+                            inputFields.forEach(field => {
+                                const fieldName = (field.name || "").toLowerCase();
+
+                                let value = null;
+                                if (fieldName.includes('id') || fieldName.includes('uid') || fieldName.includes('tài khoản')) {
+                                    value = accountInfo.uid || accountInfo.id || accountInfo.username;
+                                } else if (fieldName.includes('server') || fieldName.includes('máy chủ')) {
+                                    value = accountInfo.server;
+                                } else if (fieldName.includes('zone') || fieldName.includes('khu vực')) {
+                                    value = accountInfo.zone || accountInfo.server;
+                                }
+
+                                if (value) {
+                                    dynamicParams[`fields_${field.id}`] = value;
+                                }
+                            });
+                        }
+
+                        console.log(`[OrderService] Constructed Dynamics:`, dynamicParams);
+                        console.log(`[OrderService] Call NapGame247 API: Game=${extGameId}, Pkg=${extPkgId}, Qty=${qty}`);
+
+                        NapGame247Service.buyItem(extGameId, extPkgId, qty, dynamicParams).then(async (res) => {
+                            console.log("[OrderService] NapGame247 Result:", JSON.stringify(res));
+
+                            if (res && res.status === 'success' && res.data && res.data.id) {
+                                await db.update(orders)
+                                    .set({
+                                        api_id: res.data.id,
+                                        status: 'processing',
+                                        updated_at: new Date()
+                                    })
+                                    .where(eq(orders.id, createdOrder.id));
+
+                                console.log(`[OrderService] Order #${createdOrder.id} LINKED & PROCESSING. External Order ID: ${res.data.id}`);
+                            } else {
+                                console.error(`[OrderService] Order #${createdOrder.id} FAILED TO LINK (Forward Error):`, res?.message || "Unknown error");
+                            }
+                        }).catch(err => console.error("[OrderService] NapGame247 Call Exception:", err));
+                    } else {
+                        console.log("[OrderService] Skip NapGame247: Game or Package missing 'api_id'");
+                    }
+
+                } else {
+                    console.log("[OrderService] Skip Forwarding: No api_source configured for this game.");
+                }
+
+            } catch (err) {
+                console.error("[OrderService] Error preparing API forward:", err);
+            }
+        }
+
+        return createdOrder;
     },
 
     getAllOrders: async (page = 1) => {
@@ -206,37 +366,41 @@ const OrderService = {
         const limit = 10;
         const offset = (page - 1) * limit;
         const base = buildOrderQuery();
+
+        // We need to re-define aliases to use them in the search condition
+        // However, buildOrderQuery returns a constructed object, not the raw query builder for us to inject 'where'.
+        // So we might need to manually construct the search join similar to buildOrderQuery but exposed for WHERE clause.
+
         const usersNap = aliasedTable(users, "user_nap");
 
         const searchTerm = `%${keyword}%`;
         const searchCondition = or(
-            sql`CAST(${orders.id} AS CHAR) ILIKE ${searchTerm}`,
-            ilike(users.email, searchTerm),
-            ilike(usersNap.email, searchTerm), // Note: Need aliased join for this to work perfectly, handled in buildOrderQuery logic
-            ilike(topupPackages.package_name, searchTerm),
-            ilike(games.name, searchTerm)
+            sql`CAST(${orders.id} AS CHAR) LIKE ${searchTerm}`,
+            like(users.email, searchTerm),
+            like(usersNap.email, searchTerm),
+            like(topupPackages.package_name, searchTerm),
+            like(games.name, searchTerm)
         );
 
-        // Re-construct joins explicitly to access aliases if needed, but buildOrderQuery usage:
-        const query = db.select(base.selection)
+        // Execute Search Data
+        const data = await db.select(base.selection)
             .from(orders)
             .innerJoin(users, eq(orders.user_id, users.id))
             .leftJoin(usersNap, eq(orders.user_id_nap, usersNap.id))
-            .innerJoin(topupPackages, eq(orders.package_id, topupPackages.id))
-            .innerJoin(games, eq(topupPackages.game_id, games.id))
+            .leftJoin(topupPackages, eq(orders.package_id, topupPackages.id))
+            .leftJoin(games, eq(topupPackages.game_id, games.id))
             .where(searchCondition)
             .orderBy(desc(orders.updated_at))
             .limit(limit)
             .offset(offset);
 
-        const data = await query;
-
+        // Execute Search Count
         const [total] = await db.select({ count: sql`COUNT(*)` })
             .from(orders)
             .innerJoin(users, eq(orders.user_id, users.id))
             .leftJoin(usersNap, eq(orders.user_id_nap, usersNap.id))
-            .innerJoin(topupPackages, eq(orders.package_id, topupPackages.id))
-            .innerJoin(games, eq(topupPackages.game_id, games.id))
+            .leftJoin(topupPackages, eq(orders.package_id, topupPackages.id))
+            .leftJoin(games, eq(topupPackages.game_id, games.id))
             .where(searchCondition);
 
         return { orders: data, total: Number(total.count) };
@@ -279,7 +443,25 @@ const OrderService = {
         };
     },
 
-    updateOrderStatus: async (id, status) => {
+    acceptOrder: async (id, adminId) => {
+        // Check if order exists
+        const [order] = await db.select().from(orders).where(eq(orders.id, id));
+        if (!order) throw { status: 404, message: 'Đơn hàng không tồn tại' };
+
+        // Update status and admin handler
+        await db.update(orders)
+            .set({
+                status: 'processing',
+                user_id_nap: adminId,
+                updated_at: new Date()
+            })
+            .where(eq(orders.id, id));
+
+        // Return updated order
+        return await OrderService.getOrderById(id);
+    },
+
+    changeOrderStatus: async (id, status) => {
         await db.update(orders)
             .set({ status: status, updated_at: new Date() })
             .where(eq(orders.id, id));
@@ -304,7 +486,31 @@ const OrderService = {
     },
 
     completeOrder: async (id) => {
-        return OrderService.updateOrderStatus(id, "success");
+        const updatedOrder = await OrderService.changeOrderStatus(id, "success");
+
+        // Send socket notification (real-time)
+        try {
+            emitToUser(updatedOrder.user_id, "order_status_update", {
+                orderId: id,
+                status: "success",
+                packageName: updatedOrder.package_name,
+                amount: updatedOrder.amount,
+                message: "🎉 Đơn hàng đã hoàn thành!"
+            });
+        } catch (socketError) {
+            console.error('❌ Failed to emit socket:', socketError);
+        }
+
+        // Send email notification (non-blocking)
+        if (updatedOrder && updatedOrder.user_email) {
+            try {
+                await sendOrderSuccessEmail(updatedOrder.user_email, updatedOrder);
+            } catch (emailError) {
+                console.error('❌ Failed to send order success email:', emailError);
+            }
+        }
+
+        return updatedOrder;
     },
 
     cancelOrderAndRefund: async (id) => {
@@ -313,10 +519,32 @@ const OrderService = {
 
         await db.update(orders).set({ status: 'cancelled', updated_at: new Date() }).where(eq(orders.id, id));
 
-        const refundAmount = order.amount - (order.profit || 0);
+        const refundAmount = Number(order.amount);
         await UserService.updateBalance(order.user_id, refundAmount, 'credit', `Hoàn tiền đơn hàng #${id}`);
 
-        return { message: "Cancelled and refunded" };
+        // Send socket notification (real-time)
+        try {
+            emitToUser(order.user_id, "order_status_update", {
+                orderId: id,
+                status: "cancelled",
+                packageName: order.package_name,
+                refundAmount: refundAmount,
+                message: "⚠️ Đơn hàng đã bị hủy và hoàn tiền!"
+            });
+        } catch (socketError) {
+            console.error('❌ Failed to emit socket:', socketError);
+        }
+
+        // Send email notification (non-blocking)
+        if (order && order.user_email) {
+            try {
+                await sendOrderFailureEmail(order.user_email, order, "Đơn hàng đã bị hủy và hoàn tiền");
+            } catch (emailError) {
+                console.error('❌ Failed to send order failure email:', emailError);
+            }
+        }
+
+        return { message: "Cancelled and refunded", refundAmount };
     },
 
     getUserFinancialSummary: async (userId) => {

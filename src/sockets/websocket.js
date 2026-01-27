@@ -1,12 +1,47 @@
 const { verifyToken } = require("../services/jwt.service");
+const { db } = require("../configs/drizzle");
+const { users } = require("../db/schema");
+const { eq } = require("drizzle-orm");
 
+// Map: socketId -> userData
 const userSocketMap = new Map();
+// Map: userId -> Set of socketIds (để track multiple tabs/devices)
+const userIdToSockets = new Map();
 
 let _io = null;
 
+// Helper: Track socket by userId
+function trackSocket(socketId, userId) {
+  if (!userIdToSockets.has(userId)) {
+    userIdToSockets.set(userId, new Set());
+  }
+  userIdToSockets.get(userId).add(socketId);
+}
+
+// Helper: Untrack socket when disconnected
+function untrackSocket(socketId, userId) {
+  if (userId && userIdToSockets.has(userId)) {
+    userIdToSockets.get(userId).delete(socketId);
+    if (userIdToSockets.get(userId).size === 0) {
+      userIdToSockets.delete(userId);
+    }
+  }
+}
+
+// Helper: Get fresh balance from database
+async function getFreshBalance(userId) {
+  try {
+    const [user] = await db.select({ balance: users.balance }).from(users).where(eq(users.id, userId));
+    return user?.balance ?? 0;
+  } catch (error) {
+    console.error("Failed to fetch balance from DB:", error);
+    return 0;
+  }
+}
+
 function initSocket(io) {
   _io = io;
-  io.on("connection", (socket) => {
+  io.on("connection", async (socket) => {
     console.log(`Socket connected: ${socket.id}`);
 
     // Parse cookie from handshake
@@ -22,48 +57,73 @@ function initSocket(io) {
     if (token) {
       const { valid, decoded, error } = verifyToken(token);
       if (valid) {
-        const { id, balance, email, name } = decoded;
-        const userData = { id, balance, email, name };
+        const { id, email, name } = decoded;
+
+        // IMPORTANT: Fetch fresh balance from database, NOT from JWT token
+        const freshBalance = await getFreshBalance(id);
+
+        const userData = { id, balance: freshBalance, email, name };
         userSocketMap.set(socket.id, userData);
+        trackSocket(socket.id, id); // Track này để emit tới user dễ hơn
         socket.user = userData;
         socket.emit("authenticated", userData);
-        console.log(`Socket authenticated via cookie: ${name}`);
+        console.log(`✅ Socket authenticated via cookie: ${name} (userId: ${id}), balance: ${freshBalance}`);
       } else {
         console.log("Invalid token in cookie");
         // Optional: socket.disconnect();
       }
     }
 
-    // Keep manual auth for backward compatibility or if cookie fails?
-    // User requested "fix login page... save to cookie".
-    // I will keep manual auth listener just in case but update FE to not use it if possible.
-    // Actually, if I update FE to not emit 'auth', this listener won't be called.
-    socket.on("auth", (token) => {
+    // Keep manual auth for backward compatibility
+    socket.on("auth", async (token) => {
       const { valid, decoded, error } = verifyToken(token);
       if (!valid) {
         socket.emit("error", { message: "Invalid token", error });
         return;
       }
-      const { id, balance, email, name } = decoded;
-      const userData = { id, balance, email, name };
+      const { id, email, name } = decoded;
+
+      // Fetch fresh balance from database
+      const freshBalance = await getFreshBalance(id);
+
+      const userData = { id, balance: freshBalance, email, name };
       userSocketMap.set(socket.id, userData);
+      trackSocket(socket.id, id);
       socket.user = userData;
       socket.emit("authenticated", userData);
+      console.log(`✅ Socket authenticated via manual auth: ${name} (userId: ${id})`);
     });
 
     socket.on("disconnect", () => {
+      const userData = userSocketMap.get(socket.id);
+      if (userData) {
+        untrackSocket(socket.id, userData.id);
+      }
       userSocketMap.delete(socket.id);
-      console.log(`Socket disconnected: ${socket.id}`);
+      console.log(`🔌 Socket disconnected: ${socket.id}`);
     });
   });
 }
 
+function getIO() {
+  return _io;
+}
+
 function emitToUser(userId, event, data) {
-  if (!_io) return;
+  if (!_io) {
+    console.log("❌ Socket IO not initialized when trying to emit", event);
+    return;
+  }
+  let sent = false;
   for (const [socketId, userData] of userSocketMap.entries()) {
-    if (userData.id === userId) {
+    if (userData.id == userId) { // Use loose equality for safety
       _io.to(socketId).emit(event, data);
+      console.log(`✅ Emitted '${event}' to socket ${socketId} for userId ${userId}`);
+      sent = true;
     }
+  }
+  if (!sent) {
+    console.log(`⚠️ User ${userId} not connected or no socket found. Map size: ${userSocketMap.size}`);
   }
 }
 

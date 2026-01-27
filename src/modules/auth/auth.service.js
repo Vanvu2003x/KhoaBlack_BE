@@ -94,7 +94,7 @@ const AuthService = {
         const otp = Math.floor(100000 + Math.random() * 900000);
         await client.set(`otp:forgot:${email}`, otp, { EX: 300 });
         await sendOTPRePass(email, otp);
-        console.log("OTP Forgot Password: " + otp);
+        if (process.env.NODE_ENV !== 'production') console.log("OTP Forgot Password:", otp);
 
         return { status: "ok", message: "Đã gửi OTP về email" };
     },
@@ -145,7 +145,7 @@ const AuthService = {
         await client.set(`otp:admin:${email}`, otp, { EX: 300 });
         await sendAdminBalanceOTP(email, otp);
 
-        console.log("Admin OTP:", otp);
+        if (process.env.NODE_ENV !== 'production') console.log("Admin OTP:", otp);
         return { status: "ok", message: "Đã gửi OTP xác thực đến email admin" };
     },
 
@@ -211,7 +211,7 @@ const AuthService = {
         const { sendRolePromotionOTP } = require("../../services/nodemailer.service");
         await sendRolePromotionOTP(adminUser.email, otp, targetUser.email, newRole);
 
-        console.log("Role OTP:", otp);
+        if (process.env.NODE_ENV !== 'production') console.log("Role OTP:", otp);
         return { status: "ok", message: "Đã gửi OTP xác thực thăng cấp đến email admin" };
     },
 

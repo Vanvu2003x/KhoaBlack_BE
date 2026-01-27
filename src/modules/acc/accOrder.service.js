@@ -15,8 +15,8 @@ const buildAccOrderQuery = () => {
             created_at: accOrders.created_at,
             updated_at: accOrders.updated_at,
             acc_image: acc.image,
-            acc_username: sql`COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(${accOrders.contact_info}, "$.acc_username")), 'null'), ${acc.username})`,
-            acc_password: sql`COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(${accOrders.contact_info}, "$.acc_password")), 'null'), ${acc.password})`,
+            acc_username: sql`JSON_UNQUOTE(JSON_EXTRACT(${accOrders.contact_info}, "$.acc_username"))`,
+            acc_password: sql`JSON_UNQUOTE(JSON_EXTRACT(${accOrders.contact_info}, "$.acc_password"))`,
             acc_info: sql`COALESCE(NULLIF(JSON_UNQUOTE(JSON_EXTRACT(${accOrders.contact_info}, "$.acc_info")), 'null'), ${acc.info})`,
             user_name: users.name,
             user_email: users.email,
@@ -38,7 +38,7 @@ const UserService = require("../user/user.service");
 
 const AccOrderService = {
     createOrder: async (userId, { acc_id, contact_info }) => {
-        return await db.transaction(async (tx) => {
+        const transactionResult = await db.transaction(async (tx) => {
             // 1. Check account status & price
             const [account] = await tx.select().from(acc).where(eq(acc.id, acc_id));
 
@@ -55,15 +55,27 @@ const AccOrderService = {
             if (!user) throw { status: 404, message: "User not found" };
 
             // Calculate Price based on Level
-            const level = user.level || 1;
+            const level = Number(user.level) || 1;
             let finalPrice = Number(account.price);
 
-            if (level === 2 && account.price_pro) finalPrice = Number(account.price_pro);
-            if (level === 3 && account.price_plus) finalPrice = Number(account.price_plus);
+            console.log(`💰 Calculating Price for User Level ${level} (Raw: ${user.level}). Default: ${finalPrice}`);
+
+            if (level === 2 && account.price_pro) {
+                finalPrice = Number(account.price_pro);
+                console.log(`   -> Level 2 applied. Price: ${finalPrice}`);
+            }
+            if (level === 3 && account.price_plus) {
+                finalPrice = Number(account.price_plus);
+                console.log(`   -> Level 3 applied. Price: ${finalPrice}`);
+            }
             // Basic override
-            if (level === 1 && account.price_basic) finalPrice = Number(account.price_basic);
+            if (level === 1 && account.price_basic) {
+                finalPrice = Number(account.price_basic);
+                console.log(`   -> Level 1 applied. Price: ${finalPrice}`);
+            }
 
             const price = finalPrice;
+            console.log(`✅ Final Price: ${price}`);
 
             // 2. Deduct User Balance (Checks sufficiency internally)
             if (user.balance < price) {
@@ -91,6 +103,14 @@ const AccOrderService = {
                 description: `Mua account #${acc_id}`
             });
 
+            // Real-time Balance Update
+            try {
+                const { emitToUser } = require("../../sockets/websocket");
+                emitToUser(userId, "balance_update", balanceAfter);
+            } catch (e) {
+                console.error("Socket emit error:", e);
+            }
+
             // 4. Create Order & Update Acc Status
             const newOrder = {
                 acc_id,
@@ -105,8 +125,13 @@ const AccOrderService = {
             // Mark acc as sold
             await tx.update(acc).set({ status: 'sold' }).where(eq(acc.id, acc_id));
 
-            return { success: true, message: "Mua tài khoản thành công! orderId: " + result.insertId };
+            return { success: true, message: "Mua tài khoản thành công!", orderId: result.insertId };
         });
+
+        // 5. Send Acc to Email (DISABLED - Admin sends manually)
+        // if (transactionResult.success && transactionResult.orderId) { ... }
+
+        return transactionResult;
     },
 
     cancelOrder: async (orderId) => {
