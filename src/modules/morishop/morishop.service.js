@@ -115,7 +115,7 @@ class MorishopService {
                 // Create new game
                 console.log(`[Morishop] Creating Game: ${gameName}`);
                 const newGameId = crypto.randomUUID();
-                const gamecode = gameName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') + '-' + Date.now();
+                const gamecode = gameName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
                 await db.insert(games).values({
                     id: newGameId,

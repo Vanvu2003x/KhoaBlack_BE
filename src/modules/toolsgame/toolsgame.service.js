@@ -42,8 +42,8 @@ class ToolsGameService {
         try {
             console.log(`[${new Date().toISOString()}] Running Game Sync...`);
 
-            // 1. Sync NapGame247 Identity V (or all synced games)
-            await napGame247Service.syncIdentityV();
+            // 1. Sync NapGame247 (Identity V, HSR, LoveAndDeepspace...)
+            await napGame247Service.syncAllGames();
 
             // 2. Sync Morishop Games
             await morishopService.syncGames([

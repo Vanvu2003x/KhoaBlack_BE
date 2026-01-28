@@ -114,19 +114,20 @@ class NapGame247Service {
         }
     }
 
-    async syncIdentityV() {
-        console.log("Starting Identity V Sync...");
-        const responseCallback = await this.fetchProducts(12);
+    async syncGame(targetId, cachedData = null) {
+        let responseCallback = cachedData;
+
+        if (!responseCallback) {
+            console.log(`[Sync] Fetching fresh data for Game ID: ${targetId}...`);
+            responseCallback = await this.fetchProducts();
+        } else {
+            console.log(`[Sync] Using cached data for Game ID: ${targetId}...`);
+        }
 
         if (!responseCallback || responseCallback.status !== 'success') {
             console.error("Failed to fetch data from NapGame247");
             return;
         }
-
-        // The API returns a structure where data is an array of categories (Game PC, Game Mobile).
-        // We need to traverse to find the game with id=12.
-        // Based on user provided JSON:
-        // data: [ { games: [ { id: 12, name: 'Identity V (UID)', items: [...] } ] } ]
 
         let targetGameData = null;
 
@@ -134,7 +135,7 @@ class NapGame247Service {
         for (const category of responseCallback.data) {
             if (category.games) {
                 for (const game of category.games) {
-                    if (game.id === 12) {
+                    if (game.id === targetId) {
                         targetGameData = game;
                         break;
                     }
@@ -144,7 +145,7 @@ class NapGame247Service {
         }
 
         if (!targetGameData) {
-            console.error("Game ID 12 (Identity V) not found in response.");
+            console.error(`Game ID ${targetId} not found in response.`);
             return;
         }
 
@@ -156,8 +157,6 @@ class NapGame247Service {
         let inputFields = []; // Store raw form_fields logic
 
         if (targetGameData.form_fields && Array.isArray(targetGameData.form_fields)) {
-            // Save the entire form_fields array or simplified version
-            // We need 'id' and 'name' mapping. e.g. "Game ID" -> id: 35
             inputFields = targetGameData.form_fields.map(f => ({
                 id: f.id,
                 name: f.name,
@@ -182,7 +181,7 @@ class NapGame247Service {
                 api_id: targetGameData.id,
                 api_source: 'napgame247',
                 name: targetGameData.name,
-                gamecode: Date.now().toString(), // Improved slug generation needed, but using unique for now
+                gamecode: targetGameData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
                 thumbnail: '/uploads/default-game.png',
                 publisher: 'Auto-Sync',
                 server: serverList,
@@ -278,7 +277,30 @@ class NapGame247Service {
                 });
             }
         }
-        console.log("Sync completed.");
+        console.log(`Sync completed for Game ID: ${targetId}.`);
+    }
+
+    async syncAllGames() {
+        console.log("Starting Sync for All Configured Games...");
+
+        // Fetch ONCE for all games
+        const allData = await this.fetchProducts();
+
+        if (!allData || allData.status !== 'success') {
+            console.error("Failed to fetch data from NapGame247. Sync Aborted.");
+            return;
+        }
+
+        // 12: Identity V
+        // 3: Honkai Star Rail (UID)
+        // 10: Love And Deepspace (UID)
+        const gameIds = [12, 3, 10];
+
+        for (const id of gameIds) {
+            // Pass the cached data
+            await this.syncGame(id, allData);
+        }
+        console.log("All Games Sync Completed.");
     }
 }
 
