@@ -78,6 +78,11 @@ class ToolsGameService {
 
             console.log(`Found ${pendingOrders.length} pending orders to check.`);
 
+            if (pendingOrders.length === 0) {
+                console.log("No pending orders found. Skipping API calls.");
+                return;
+            }
+
             // Parallel Processing using Promise.all - DISABLED for performance
             // Limit concurrency if needed, but for < 100 orders, Promise.all calls API simultaneously, potentially causing lag
             // Use sequential processing instead

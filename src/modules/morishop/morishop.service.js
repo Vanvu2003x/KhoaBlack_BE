@@ -27,7 +27,8 @@ class MorishopService {
             }, {
                 headers: {
                     'Content-Type': 'application/json'
-                }
+                },
+                timeout: 15000 // 15s timeout
             });
 
             return response.data;
