@@ -114,16 +114,27 @@ function emitToUser(userId, event, data) {
     console.log("❌ Socket IO not initialized when trying to emit", event);
     return;
   }
-  let sent = false;
-  for (const [socketId, userData] of userSocketMap.entries()) {
-    if (userData.id == userId) { // Use loose equality for safety
-      _io.to(socketId).emit(event, data);
-      console.log(`✅ Emitted '${event}' to socket ${socketId} for userId ${userId}`);
-      sent = true;
+
+  // ✅ Optimized: O(1) lookup instead of O(N) loop
+  if (userIdToSockets.has(userId)) {
+    const socketIds = userIdToSockets.get(userId);
+    let sent = false;
+
+    for (const socketId of socketIds) {
+      // Check if socket is still connected/in map just to be safe
+      if (userSocketMap.has(socketId)) {
+        _io.to(socketId).emit(event, data);
+        sent = true;
+      }
     }
-  }
-  if (!sent) {
-    console.log(`⚠️ User ${userId} not connected or no socket found. Map size: ${userSocketMap.size}`);
+
+    if (sent) {
+      console.log(`✅ Emitted '${event}' to user ${userId} (Sockets: ${Array.from(socketIds).join(', ')})`);
+    } else {
+      console.log(`⚠️ User ${userId} has tracked sockets but they appear inactive.`);
+    }
+  } else {
+    // console.log(`ℹ️ User ${userId} is not currently connected.`);
   }
 }
 

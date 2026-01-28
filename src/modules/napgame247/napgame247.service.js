@@ -27,7 +27,8 @@ class NapGame247Service {
             const response = await axios.get(this.baseUrl, {
                 params: {
                     api_key: apiKey
-                }
+                },
+                timeout: 15000 // 15 seconds timeout
             });
 
             console.log(`[NapGame247] Response OK:`, JSON.stringify(response.data).substring(0, 200) + '...');
@@ -76,7 +77,7 @@ class NapGame247Service {
             // Using URLSearchParams to send as application/x-www-form-urlencoded (standard for PHP-like APIs)
             // If JSON is needed, we would just pass requestParams directly.
             // But usually APIs accepting "GET" params also accept "POST" form-data/urlencoded easily.
-            const response = await axios.post(url, new URLSearchParams(requestParams));
+            const response = await axios.post(url, new URLSearchParams(requestParams), { timeout: 15000 });
 
             console.log("NapGame247 Response:", response.data);
             return response.data;
@@ -100,7 +101,8 @@ class NapGame247Service {
             console.log(`[NapGame247] CHECK STATUS URL: ${fullUrl}`);
 
             const response = await axios.get(url, {
-                params: { api_key: apiKey }
+                params: { api_key: apiKey },
+                timeout: 15000
             });
 
             console.log(`[NapGame247] CHECK RESPONSE:`, JSON.stringify(response.data));

@@ -48,11 +48,9 @@ server.listen(PORT, () => {
   console.log(`🔌 Socket.IO ready on same port: ${PORT}`);
 });
 
-// Background Job: Auto-fail pending transactions > 20 mins
-const WalletLogService = require("./modules/walletLog/walletLog.service");
-setInterval(() => {
-  WalletLogService.autoCheckExpiredTransactions();
-}, 60 * 1000); // Check every 60 seconds
+// Background Job: Auto-fail pending transactions > 20 mins - Moved to cron.service
+// const WalletLogService = require("./modules/walletLog/walletLog.service");
+// setInterval is removed to prevent overlaps
 
 // ✅ Initialize Cron Jobs
 const { initCronJobs } = require('./services/cron.service');
