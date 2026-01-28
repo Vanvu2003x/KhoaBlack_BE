@@ -114,9 +114,15 @@ class NapGame247Service {
         }
     }
 
-    async syncGame(targetId) {
-        console.log(`Starting Sync for Game ID: ${targetId}...`);
-        const responseCallback = await this.fetchProducts();
+    async syncGame(targetId, cachedData = null) {
+        let responseCallback = cachedData;
+
+        if (!responseCallback) {
+            console.log(`[Sync] Fetching fresh data for Game ID: ${targetId}...`);
+            responseCallback = await this.fetchProducts();
+        } else {
+            console.log(`[Sync] Using cached data for Game ID: ${targetId}...`);
+        }
 
         if (!responseCallback || responseCallback.status !== 'success') {
             console.error("Failed to fetch data from NapGame247");
@@ -276,13 +282,23 @@ class NapGame247Service {
 
     async syncAllGames() {
         console.log("Starting Sync for All Configured Games...");
+
+        // Fetch ONCE for all games
+        const allData = await this.fetchProducts();
+
+        if (!allData || allData.status !== 'success') {
+            console.error("Failed to fetch data from NapGame247. Sync Aborted.");
+            return;
+        }
+
         // 12: Identity V
         // 3: Honkai Star Rail (UID)
         // 10: Love And Deepspace (UID)
         const gameIds = [12, 3, 10];
 
         for (const id of gameIds) {
-            await this.syncGame(id);
+            // Pass the cached data
+            await this.syncGame(id, allData);
         }
         console.log("All Games Sync Completed.");
     }
