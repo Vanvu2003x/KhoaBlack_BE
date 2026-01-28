@@ -14,8 +14,18 @@ const PackageService = {
         return result || null;
     },
 
-    getPackagesByGameCode: async (game_code, id_server = null) => {
-        let query = db.select({
+    getPackagesByGameCode: async (game_code, id_server = null, isAdmin = false) => {
+        const conditions = [eq(games.gamecode, game_code)];
+
+        if (id_server) {
+            conditions.push(eq(topupPackages.id_server, id_server));
+        }
+
+        if (!isAdmin) {
+            conditions.push(eq(topupPackages.status, 'active'));
+        }
+
+        return await db.select({
             id: topupPackages.id,
             api_id: topupPackages.api_id,
             package_name: topupPackages.package_name,
@@ -35,18 +45,8 @@ const PackageService = {
         })
             .from(topupPackages)
             .innerJoin(games, eq(topupPackages.game_id, games.id))
-            .where(eq(games.gamecode, game_code));
-
-        if (id_server) {
-            // Note: id_server in schema is boolean, but function implies matching a value mechanism or boolean filter?
-            // Original code: AND tp.id_server = $2 -> passed id_server param
-            // Schema has id_server: boolean('id_server').default(false)
-            // If the param is meant to filter true/false, simple eq.
-            query.where(eq(topupPackages.id_server, id_server));
-        }
-
-        const result = await query.orderBy(asc(topupPackages.price));
-        return result;
+            .where(and(...conditions))
+            .orderBy(asc(topupPackages.price));
     },
 
     createPackage: async (data, file) => {
@@ -143,6 +143,7 @@ const PackageService = {
         if (data.package_type !== undefined) updateData.package_type = data.package_type;
         if (data.id_server !== undefined) updateData.id_server = data.id_server;
         if (data.sale !== undefined) updateData.sale = data.sale;
+        if (data.status !== undefined) updateData.status = data.status;
 
         // Pricing Logic
         const originPrice = data.origin_price !== undefined ? parseInt(data.origin_price) : currentPkg.origin_price;
@@ -260,7 +261,7 @@ const PackageService = {
     // Aliases & Missing matches
     getPackagesByGameSlug: async (game_code, id_server = null, isAdmin) => {
         // reuse getPackagesByGameCode
-        return await PackageService.getPackagesByGameCode(game_code, id_server);
+        return await PackageService.getPackagesByGameCode(game_code, id_server, isAdmin);
     },
 
     deletePackage: async (id) => {
