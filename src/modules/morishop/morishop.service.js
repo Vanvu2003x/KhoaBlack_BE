@@ -171,13 +171,13 @@ class MorishopService {
                 );
 
                 // Get game markup and profit percentages
-                const originMarkup = (existingGame.origin_markup_percent && existingGame.origin_markup_percent > 0) ? existingGame.origin_markup_percent : 1;
+                const markupPercent = existingGame.origin_markup_percent || 0;
                 const percentBasic = existingGame.profit_percent_basic || 0;
                 const percentPro = existingGame.profit_percent_pro || 0;
                 const percentPlus = existingGame.profit_percent_plus || 0;
 
                 // Step 1: Calculate origin price from API price (VND)
-                const originPrice = Math.ceil(apiPrice * originMarkup);
+                const originPrice = Math.ceil(apiPrice * (1 + markupPercent / 100));
 
                 // Step 2: Calculate selling prices from origin price
                 const priceBasic = Math.ceil(originPrice * (1 + percentBasic / 100));

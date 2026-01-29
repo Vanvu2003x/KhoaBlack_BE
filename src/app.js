@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 const path = require('path');
 const cookieParser = require('cookie-parser');
 
@@ -38,6 +39,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.use(helmet()); // Security headers
 app.use(cookieParser());
 
 app.use(express.json());

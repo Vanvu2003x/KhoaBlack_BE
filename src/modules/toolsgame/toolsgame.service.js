@@ -52,6 +52,7 @@ class ToolsGameService {
                 'Honkai: Star Rail',
                 'Zenless Zone Zero',
                 'Punishing Gray Raven',
+                'Punishing: Gray Raven', // Added variation just in case
                 'Honor Of Kings'
             ]);
 
