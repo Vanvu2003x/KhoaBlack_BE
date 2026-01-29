@@ -163,136 +163,162 @@ const OrderService = {
         });
 
         // Post-Transaction: Forward to NapGame247
-        if (createdOrder && packageDetails) {
-            console.log("[OrderService] Triggering API forwarding check...");
-            const NapGame247Service = require("../napgame247/napgame247.service");
-            const MorishopService = require("../morishop/morishop.service");
-
-            // Determine External IDs and Map Fields
-            try {
-                // Get fresh IDs just in case
-                const { topupPackages, games } = require("../../db/schema");
-                const [pkg] = await db.select().from(topupPackages).where(eq(topupPackages.id, data.package_id));
-                const [game] = await db.select().from(games).where(eq(games.id, pkg.game_id));
-
-                const apiSource = game?.api_source; // 'napgame247' or 'morishop'
-                const fileAPI = pkg?.fileAPI || {};
-
-                console.log(`[OrderService] API Source: ${apiSource}`);
-
-                // Parse account_info
-                let accountInfo = data.account_info;
-                if (typeof accountInfo === 'string') {
-                    try {
-                        accountInfo = JSON.parse(accountInfo);
-                    } catch (e) {
-                        console.error("[OrderService] Failed to parse account_info JSON:", e);
-                        accountInfo = {};
-                    }
-                } else {
-                    accountInfo = accountInfo || {};
-                }
-
-                console.log(`[OrderService] Parsed Account Info:`, JSON.stringify(accountInfo));
-
-                // Route to correct API
-                if (apiSource === 'morishop') {
-                    // === MORISHOP FORWARD ===
-                    const serviceId = fileAPI.service_id;
-                    const userId = accountInfo.user_id || accountInfo.uid || accountInfo.id;
-                    const serverId = accountInfo.server_id || accountInfo.server || '';
-
-                    if (serviceId && userId) {
-                        console.log(`[OrderService] Forwarding to Morishop: service=${serviceId}, userId=${userId}, serverId=${serverId}`);
-
-                        MorishopService.buyItem(serviceId, userId, serverId, createdOrder.id.toString()).then(async (res) => {
-                            console.log("[OrderService] Morishop Result:", JSON.stringify(res));
-
-                            // Morishop returns { status: true, data: { id: "ORDER...", status: "pending" } }
-                            if (res && res.status === true && res.data && res.data.id) {
-                                await db.update(orders)
-                                    .set({
-                                        api_id: res.data.id, // Morishop returns id, not order_id
-                                        status: 'processing',
-                                        updated_at: new Date()
-                                    })
-                                    .where(eq(orders.id, createdOrder.id));
-
-                                console.log(`[OrderService] Order #${createdOrder.id} LINKED to Morishop. External ID: ${res.data.id}`);
-                            } else {
-                                console.error(`[OrderService] Order #${createdOrder.id} Morishop Forward Failed:`, res?.msg || "Unknown error");
-                            }
-                        }).catch(err => console.error("[OrderService] Morishop Call Exception:", err));
-                    } else {
-                        console.log("[OrderService] Skip Morishop: Missing service_id or user_id");
-                    }
-
-                } else if (apiSource === 'napgame247' || game?.api_id) {
-                    // === NAPGAME247 FORWARD ===
-                    const extGameId = game?.api_id;
-                    const extPkgId = pkg?.api_id;
-                    const inputFields = game?.input_fields || [];
-
-                    console.log(`[OrderService] External Mapping -> Game ExtID: ${extGameId}, Package ExtID: ${extPkgId}`);
-
-                    if (extGameId && extPkgId) {
-                        console.log(`[OrderService] Input Fields Config:`, JSON.stringify(inputFields));
-
-                        const dynamicParams = {};
-
-                        if (Array.isArray(inputFields)) {
-                            inputFields.forEach(field => {
-                                const fieldName = (field.name || "").toLowerCase();
-
-                                let value = null;
-                                if (fieldName.includes('id') || fieldName.includes('uid') || fieldName.includes('tài khoản')) {
-                                    value = accountInfo.uid || accountInfo.id || accountInfo.username;
-                                } else if (fieldName.includes('server') || fieldName.includes('máy chủ')) {
-                                    value = accountInfo.server;
-                                } else if (fieldName.includes('zone') || fieldName.includes('khu vực')) {
-                                    value = accountInfo.zone || accountInfo.server;
-                                }
-
-                                if (value) {
-                                    dynamicParams[`fields_${field.id}`] = value;
-                                }
-                            });
-                        }
-
-                        console.log(`[OrderService] Constructed Dynamics:`, dynamicParams);
-                        console.log(`[OrderService] Call NapGame247 API: Game=${extGameId}, Pkg=${extPkgId}, Qty=${qty}`);
-
-                        NapGame247Service.buyItem(extGameId, extPkgId, qty, dynamicParams).then(async (res) => {
-                            console.log("[OrderService] NapGame247 Result:", JSON.stringify(res));
-
-                            if (res && res.status === 'success' && res.data && res.data.id) {
-                                await db.update(orders)
-                                    .set({
-                                        api_id: res.data.id,
-                                        status: 'processing',
-                                        updated_at: new Date()
-                                    })
-                                    .where(eq(orders.id, createdOrder.id));
-
-                                console.log(`[OrderService] Order #${createdOrder.id} LINKED & PROCESSING. External Order ID: ${res.data.id}`);
-                            } else {
-                                console.error(`[OrderService] Order #${createdOrder.id} FAILED TO LINK (Forward Error):`, res?.message || "Unknown error");
-                            }
-                        }).catch(err => console.error("[OrderService] NapGame247 Call Exception:", err));
-                    } else {
-                        console.log("[OrderService] Skip NapGame247: Game or Package missing 'api_id'");
-                    }
-
-                } else {
-                    console.log("[OrderService] Skip Forwarding: No api_source configured for this game.");
-                }
-
-            } catch (err) {
-                console.error("[OrderService] Error preparing API forward:", err);
-            }
+        if (createdOrder) {
+            // Non-blocking call to process external order
+            OrderService.processOrderExternal(createdOrder, data.package_id, data.account_info).catch(err => {
+                console.error(`[OrderService] Error in processOrderExternal for Order #${createdOrder.id}:`, err);
+            });
         }
 
         return createdOrder;
+    },
+
+    processOrderExternal: async (order, packageId, accountInfoData) => {
+        console.log(`[OrderService] Triggering API forwarding check for Order #${order.id}...`);
+        const NapGame247Service = require("../napgame247/napgame247.service");
+        const MorishopService = require("../morishop/morishop.service");
+        const { topupPackages, games, orders } = require("../../db/schema");
+
+        try {
+            // Get fresh IDs and definitions
+            const [pkg] = await db.select().from(topupPackages).where(eq(topupPackages.id, packageId));
+            if (!pkg) {
+                console.error(`[OrderService] Package ${packageId} not found for Order #${order.id}`);
+                return;
+            }
+            const [game] = await db.select().from(games).where(eq(games.id, pkg.game_id));
+
+            const apiSource = game?.api_source; // 'napgame247' or 'morishop'
+            const fileAPI = pkg?.fileAPI || {};
+
+            console.log(`[OrderService] API Source: ${apiSource}`);
+
+            // Parse account_info
+            let accountInfo = accountInfoData;
+
+            if (typeof accountInfo === 'string') {
+                try {
+                    accountInfo = JSON.parse(accountInfo);
+                } catch (e) {
+                    console.error("[OrderService] Failed to parse account_info JSON:", e);
+                    accountInfo = {};
+                }
+            } else {
+                accountInfo = accountInfo || {};
+            }
+
+            // If 'accountInfo' was passed as null/undefined (e.g. retry), try to use order.account_info
+            if (!accountInfoData && order.account_info) {
+                if (typeof order.account_info === 'string') {
+                    try {
+                        accountInfo = JSON.parse(order.account_info);
+                    } catch (e) {
+                        accountInfo = {};
+                    }
+                } else {
+                    accountInfo = order.account_info;
+                }
+            }
+
+            console.log(`[OrderService] Parsed Account Info:`, JSON.stringify(accountInfo));
+
+            // Route to correct API
+            if (apiSource === 'morishop') {
+                // === MORISHOP FORWARD ===
+                const serviceId = fileAPI.service_id;
+                const userId = accountInfo.user_id || accountInfo.uid || accountInfo.id;
+                const serverId = accountInfo.server_id || accountInfo.server || '';
+
+                if (serviceId && userId) {
+                    console.log(`[OrderService] Forwarding to Morishop: service=${serviceId}, userId=${userId}, serverId=${serverId}`);
+
+                    const res = await MorishopService.buyItem(serviceId, userId, serverId, order.id.toString());
+                    console.log("[OrderService] Morishop Result:", JSON.stringify(res));
+
+                    // Morishop returns { status: true, data: { id: "ORDER...", status: "pending" } }
+                    if (res && res.status === true && res.data && res.data.id) {
+                        await db.update(orders)
+                            .set({
+                                api_id: res.data.id, // Morishop returns id, not order_id
+                                status: 'processing',
+                                updated_at: new Date()
+                            })
+                            .where(eq(orders.id, order.id));
+
+                        console.log(`[OrderService] Order #${order.id} LINKED to Morishop. External ID: ${res.data.id}`);
+                        return true;
+                    } else {
+                        console.error(`[OrderService] Order #${order.id} Morishop Forward Failed:`, res?.msg || "Unknown error");
+                    }
+                } else {
+                    console.log("[OrderService] Skip Morishop: Missing service_id or user_id");
+                }
+
+            } else if (apiSource === 'napgame247' || game?.api_id) {
+                // === NAPGAME247 FORWARD ===
+                const extGameId = game?.api_id;
+                const extPkgId = pkg?.api_id;
+                const inputFields = game?.input_fields || [];
+                const qty = order.quantity || 1;
+
+                console.log(`[OrderService] External Mapping -> Game ExtID: ${extGameId}, Package ExtID: ${extPkgId}`);
+
+                if (extGameId && extPkgId) {
+                    console.log(`[OrderService] Input Fields Config:`, JSON.stringify(inputFields));
+
+                    const dynamicParams = {};
+
+                    if (Array.isArray(inputFields)) {
+                        inputFields.forEach(field => {
+                            const fieldName = (field.name || "").toLowerCase();
+
+                            let value = null;
+                            if (fieldName.includes('id') || fieldName.includes('uid') || fieldName.includes('tài khoản')) {
+                                value = accountInfo.uid || accountInfo.id || accountInfo.username;
+                            } else if (fieldName.includes('server') || fieldName.includes('máy chủ')) {
+                                value = accountInfo.server;
+                            } else if (fieldName.includes('zone') || fieldName.includes('khu vực')) {
+                                value = accountInfo.zone || accountInfo.server;
+                            }
+
+                            if (value) {
+                                dynamicParams[`fields_${field.id}`] = value;
+                            }
+                        });
+                    }
+
+                    console.log(`[OrderService] Constructed Dynamics:`, dynamicParams);
+                    console.log(`[OrderService] Call NapGame247 API: Game=${extGameId}, Pkg=${extPkgId}, Qty=${qty}`);
+
+                    const res = await NapGame247Service.buyItem(extGameId, extPkgId, qty, dynamicParams);
+                    console.log("[OrderService] NapGame247 Result:", JSON.stringify(res));
+
+                    if (res && res.status === 'success' && res.data && res.data.id) {
+                        await db.update(orders)
+                            .set({
+                                api_id: res.data.id,
+                                status: 'processing',
+                                updated_at: new Date()
+                            })
+                            .where(eq(orders.id, order.id));
+
+                        console.log(`[OrderService] Order #${order.id} LINKED & PROCESSING. External Order ID: ${res.data.id}`);
+                        return true;
+                    } else {
+                        console.error(`[OrderService] Order #${order.id} FAILED TO LINK (Forward Error):`, res?.message || "Unknown error");
+                    }
+                } else {
+                    console.log("[OrderService] Skip NapGame247: Game or Package missing 'api_id'");
+                }
+
+            } else {
+                console.log("[OrderService] Skip Forwarding: No api_source configured for this game.");
+            }
+
+        } catch (err) {
+            console.error("[OrderService] Error executing processOrderExternal:", err);
+        }
+        return false;
     },
 
     getAllOrders: async (page = 1) => {
