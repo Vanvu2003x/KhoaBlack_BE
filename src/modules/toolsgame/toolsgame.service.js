@@ -49,7 +49,7 @@ class ToolsGameService {
             await morishopService.syncGames([
                 'Mobile Legends Global',
                 'Genshin Impact',
-                'Honkai: Star Rail',
+                'Honkai : Star Rail',
                 'Zenless Zone Zero',
                 'Punishing Gray Raven',
                 'Punishing: Gray Raven', // Added variation just in case

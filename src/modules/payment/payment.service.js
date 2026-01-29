@@ -41,8 +41,8 @@ const PaymentService = {
         // VietQR API config
         const bankBin = "970422"; // MB Bank BIN code
         const bankName = "MB Bank";
-        const stk = "0963575203";
-        const chusohuu = "VU DINH VAN";
+        const stk = "2196979899";
+        const chusohuu = "KHOAKUDO3";
 
         const Log = await addLogDirect({ user_id: user.id, amount });
 
