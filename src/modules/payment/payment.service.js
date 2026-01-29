@@ -38,16 +38,21 @@ const PaymentService = {
     createQR: async (user, amount) => {
         if (!amount) throw { status: 400, message: "Thiếu amount" };
 
-        const nganhang = "MBB";
+        // VietQR API config
+        const bankBin = "970422"; // MB Bank BIN code
+        const bankName = "MB Bank";
         const stk = "0963575203";
-        const chusohuu = "VU%20DINHH%20VAN";
+        const chusohuu = "VU DINH VAN";
 
         const Log = await addLogDirect({ user_id: user.id, amount });
 
         // Remove non-alphanumeric chars from ID
         const rawId = Log.id.toString().replace(/[^a-zA-Z0-9]/g, '');
-        const memo = `.${rawId}.`;
-        const url = `https://apiqr.web2m.com/api/generate/${nganhang}/${stk}/${chusohuu}?amount=${amount}&memo=${memo}&is_mask=0&bg=12`;
+        const memo = `${rawId}`;
+
+        // VietQR URL format: https://img.vietqr.io/image/{BANK_BIN}-{STK}-{TEMPLATE}.png
+        const template = "compact2"; // compact, compact2, qr_only, print
+        const url = `https://img.vietqr.io/image/${bankBin}-${stk}-${template}.png?amount=${amount}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(chusohuu)}`;
 
         return {
             id: Log.id,
@@ -55,7 +60,7 @@ const PaymentService = {
             amount: amount,
             name: user.name,
             email: user.email,
-            bank_name: nganhang,
+            bank_name: bankName,
             accountNumber: stk,
             accountHolder: chusohuu,
             memo: memo
@@ -73,7 +78,8 @@ const PaymentService = {
         if (data.status === true && Array.isArray(data.data)) {
             for (const value of data.data) {
                 try {
-                    const match = value.description.match(/\.(.*?)\.(-|$)/); // Fixed regex slightly to match end or dash? Original: /\.(.*?)\.-/
+                    // Match memo ID - supports both old format (.ID.) and new format (ID only)
+                    const match = value.description.match(/\.?([A-F0-9]{16})\.?/i);
                     // Actually let's trust original regex logic if valid: /\.(.*?)\.-/ 
                     // But if description is ".XYZ." it might not match ".-"
                     // Let's assume description format matches generated memo: `.${rawId}.`

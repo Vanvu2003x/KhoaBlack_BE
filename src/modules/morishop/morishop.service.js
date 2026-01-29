@@ -151,14 +151,10 @@ class MorishopService {
                     continue;
                 }
 
-                // IDR to VND Exchange Rate (Hardcoded for now, can be moved to DB/Env)
-                const IDR_TO_VND_RATE = 1.56;
-
+                // Use API price directly (no conversion)
                 const serviceId = pkg.id;
                 const packageName = pkg.nama_layanan?.trim();
-
-                // Convert IDR (Rp) to VND
-                const apiPrice = Math.ceil(pkg.harga_pro * IDR_TO_VND_RATE);
+                const apiPrice = pkg.harga_pro;
 
                 if (!packageName) continue;
 
