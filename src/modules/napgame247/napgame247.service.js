@@ -297,7 +297,6 @@ class NapGame247Service {
 
         const targetGameNames = [
             "Identity V",
-            "Honkai: Star Rail",
             "Love And Deepspace",
             "Honkai Impact 3"
         ];
