@@ -221,6 +221,12 @@ class NapGame247Service {
             const markupPercent = existingGame.origin_markup_percent || 0;
             const originPrice = Math.ceil(apiPrice * (1 + markupPercent / 100));
 
+            // Default profit percentages if not set (or fetch from existingGame/Config if available)
+            // Assuming these should come from existingGame or default values
+            const percentBasic = existingGame.profit_percent_basic || 0;
+            const percentPro = existingGame.profit_percent_pro || 0;
+            const percentPlus = existingGame.profit_percent_plus || 0;
+
             // Step 2: Calculate selling prices from origin price
             const priceBasic = Math.ceil(originPrice * (1 + percentBasic / 100));
             const pricePro = Math.ceil(originPrice * (1 + percentPro / 100));

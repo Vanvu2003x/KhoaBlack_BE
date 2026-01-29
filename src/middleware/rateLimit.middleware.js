@@ -10,6 +10,7 @@ const generalLimiter = rateLimit({
     },
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { xForwardedForHeader: false },
 });
 
 // Auth limiter - 5 login attempts per 15 minutes
@@ -23,6 +24,7 @@ const authLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false,
     skipSuccessfulRequests: true, // Don't count successful logins
+    validate: { xForwardedForHeader: false },
 });
 
 // OTP limiter - 3 OTP requests per 5 minutes (prevent spam)
@@ -35,6 +37,7 @@ const otpLimiter = rateLimit({
     },
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { xForwardedForHeader: false },
 });
 
 // Order creation limiter - 10 orders per minute
@@ -47,6 +50,7 @@ const orderLimiter = rateLimit({
     },
     standardHeaders: true,
     legacyHeaders: false,
+    validate: { xForwardedForHeader: false },
 });
 
 module.exports = {
