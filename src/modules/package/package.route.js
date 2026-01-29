@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const PackageController = require('./package.controller');
 const upload = require('../../configs/upload.config');
-const { checkIsAdmin } = require('../../middleware/auJWT.middleware');
+const { checkIsAdmin, optionalAuth } = require('../../middleware/auJWT.middleware');
 
 const checkAdmin = (req, res, next) => {
     // Basic check based on req.user usually, but here just a placeholder if needed or middleware usage
@@ -23,7 +23,7 @@ const setAdminFlag = (req, res, next) => {
 
 
 router.get('/', PackageController.getAllTopupPackages);
-router.get('/game/:game_code', checkIsAdmin, PackageController.getTopupPackagesByGameSlug);
+router.get('/game/:game_code', optionalAuth, PackageController.getTopupPackagesByGameSlug);
 
 router.post('/', upload.single("thumbnail"), PackageController.createTopupPackage);
 router.put('/', upload.single("thumbnail"), PackageController.updateTopupPackage);

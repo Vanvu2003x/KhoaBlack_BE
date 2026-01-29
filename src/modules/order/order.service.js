@@ -351,7 +351,7 @@ const OrderService = {
             db.select(base.selection).from(base.from)
         )
             .where(eq(orders.user_id, userId))
-            .orderBy(desc(orders.updated_at))
+            .orderBy(desc(orders.created_at))
             .limit(limit)
             .offset(offset);
 

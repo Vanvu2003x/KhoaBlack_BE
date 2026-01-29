@@ -127,8 +127,48 @@ const checkIsAdmin = async (req, res, next) => {
   next();
 };
 
+// Middleware 4: Optional Auth - Lấy user info nếu có token, không bắt buộc login
+const optionalAuth = async (req, res, next) => {
+  let token;
+  const authHeader = req.headers.authorization;
+
+  req.userLevel = 1; // Default level 1 (basic) nếu không login
+
+  if (req.cookies && req.cookies.token) {
+    token = req.cookies.token;
+  } else if (authHeader && authHeader.startsWith("Bearer ")) {
+    token = authHeader.split(" ")[1];
+  }
+
+  if (!token) {
+    return next(); // Không có token -> user level 1
+  }
+
+  try {
+    const tokenResult = verifyToken(token);
+
+    if (!tokenResult.valid || !tokenResult.decoded) {
+      return next();
+    }
+
+    const userId = tokenResult.decoded.id;
+    req.user = tokenResult.decoded;
+
+    const user = await UserService.getUserById(userId);
+    if (user) {
+      req.userLevel = user.level || 1;
+      req.isAdmin = user.role === 'admin';
+    }
+  } catch (err) {
+    console.error("❌ Lỗi optionalAuth:", err);
+  }
+
+  next();
+};
+
 module.exports = {
   checkToken,
   checkRoleMDW,
   checkIsAdmin,
+  optionalAuth,
 };

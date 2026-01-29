@@ -8,7 +8,8 @@ const PackageController = {
     }),
 
     getTopupPackagesByGameSlug: asyncHandler(async (req, res) => {
-        const result = await PackageService.getPackagesByGameSlug(req.params.game_code, req.query.id_server, req.isAdmin);
+        const userLevel = req.userLevel || 1; // Default level 1 nếu không login
+        const result = await PackageService.getPackagesByGameSlug(req.params.game_code, req.query.id_server, req.isAdmin, userLevel);
         res.json(result);
     }),
 

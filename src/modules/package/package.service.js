@@ -14,7 +14,7 @@ const PackageService = {
         return result || null;
     },
 
-    getPackagesByGameCode: async (game_code, id_server = null, isAdmin = false) => {
+    getPackagesByGameCode: async (game_code, id_server = null, isAdmin = false, userLevel = 1) => {
         const conditions = [eq(games.gamecode, game_code)];
 
         if (id_server) {
@@ -25,7 +25,7 @@ const PackageService = {
             conditions.push(eq(topupPackages.status, 'active'));
         }
 
-        return await db.select({
+        const packages = await db.select({
             id: topupPackages.id,
             api_id: topupPackages.api_id,
             package_name: topupPackages.package_name,
@@ -47,6 +47,24 @@ const PackageService = {
             .innerJoin(games, eq(topupPackages.game_id, games.id))
             .where(and(...conditions))
             .orderBy(asc(topupPackages.price));
+
+        // Map display_price theo user level
+        return packages.map(pkg => {
+            let displayPrice = pkg.price_basic || pkg.price; // Default basic
+
+            if (userLevel === 2 && pkg.price_pro) {
+                displayPrice = pkg.price_pro;
+            } else if (userLevel === 3 && pkg.price_plus) {
+                displayPrice = pkg.price_plus;
+            } else if (userLevel === 1 && pkg.price_basic) {
+                displayPrice = pkg.price_basic;
+            }
+
+            return {
+                ...pkg,
+                display_price: displayPrice
+            };
+        }).sort((a, b) => a.display_price - b.display_price);
     },
 
     createPackage: async (data, file) => {
@@ -259,9 +277,9 @@ const PackageService = {
         return result ? result.price : null;
     },
     // Aliases & Missing matches
-    getPackagesByGameSlug: async (game_code, id_server = null, isAdmin) => {
+    getPackagesByGameSlug: async (game_code, id_server = null, isAdmin, userLevel = 1) => {
         // reuse getPackagesByGameCode
-        return await PackageService.getPackagesByGameCode(game_code, id_server, isAdmin);
+        return await PackageService.getPackagesByGameCode(game_code, id_server, isAdmin, userLevel);
     },
 
     deletePackage: async (id) => {
