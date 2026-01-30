@@ -3,11 +3,17 @@ const app = require('./app');
 const http = require("http");
 const { Server } = require("socket.io");
 const { initSocket } = require("./sockets/websocket");
+
 const PORT = process.env.PORT || 5000;
+const SOCKET_PORT = process.env.SOCKET_PORT || 5001;
+
+// API Server
 const server = http.createServer(app);
 
+// Separate Socket.IO Server
+const socketServer = http.createServer();
+
 // Socket.IO CORS configuration
-// SOCKET_ORIGINS can be comma-separated list: "http://localhost:3000,https://khoablacktopup.vn"
 const getAllowedOrigins = () => {
   const originsEnv = process.env.SOCKET_ORIGINS;
   if (originsEnv) {
@@ -15,7 +21,6 @@ const getAllowedOrigins = () => {
     console.log("🔧 SOCKET_ORIGINS từ env:", origins);
     return origins;
   }
-  // Fallback: allow all in development, or use FRONTEND_URL if set
   if (process.env.NODE_ENV === 'production') {
     if (process.env.FRONTEND_URL) {
       console.log("🔧 Sử dụng FRONTEND_URL làm socket origin:", process.env.FRONTEND_URL);
@@ -30,22 +35,26 @@ console.log("🔧 NODE_ENV:", process.env.NODE_ENV || "development");
 const allowedOrigins = getAllowedOrigins();
 console.log("🔌 Socket.IO allowed origins:", allowedOrigins);
 
-const io = new Server(server, {
+const io = new Server(socketServer, {
   cors: {
-    origin: allowedOrigins,
+    origin: "*", // Allow all origins
     methods: ["GET", "POST"],
-    credentials: true
+    credentials: false // Must be false when origin is "*"
   },
-  // Ping timeout and interval for connection stability
   pingTimeout: 60000,
   pingInterval: 25000
 });
 
 initSocket(io);
 
+// Start API Server
 server.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🔌 Socket.IO ready on same port: ${PORT}`);
+  console.log(`🚀 API Server running on port ${PORT}`);
+});
+
+// Start Socket.IO Server on separate port
+socketServer.listen(SOCKET_PORT, () => {
+  console.log(`🔌 Socket.IO Server running on port ${SOCKET_PORT}`);
 });
 
 // Background Job: Auto-fail pending transactions > 20 mins - Moved to cron.service

@@ -37,8 +37,8 @@ const UserService = {
             status: users.status,
             created_at: users.created_at,
             updated_at: users.updated_at,
-            so_don_order: sql`COALESCE((SELECT COUNT(*) FROM orders WHERE orders.user_id = ${users.id}), 0)`,
-            so_don_da_nap: sql`COALESCE((SELECT COUNT(*) FROM orders WHERE orders.user_id_nap = ${users.id} AND orders.status = 'success'), 0)`,
+            so_don_order: sql`COALESCE((SELECT COUNT(*) FROM orders WHERE orders.user_id = ${users.id} AND orders.status = 'success'), 0)`,
+            so_don_da_nap: sql`COALESCE((SELECT COUNT(*) FROM topup_wallet_logs WHERE topup_wallet_logs.user_id = ${users.id} AND topup_wallet_logs.status = 'Thành Công'), 0)`,
             tong_amount: sql`COALESCE((SELECT SUM(amount) FROM topup_wallet_logs WHERE topup_wallet_logs.user_id = ${users.id} AND topup_wallet_logs.status = 'Thành Công'), 0)`
         })
             .from(users);
@@ -160,33 +160,83 @@ const UserService = {
     },
 
     searchUser: async (role, keyword) => {
-        let query = db.select({
-            id: users.id,
-            name: users.name,
-            email: users.email,
-            hash_password: users.hash_password,
-            role: users.role,
-            level: users.level,
-            balance: users.balance,
-            status: users.status,
-            created_at: users.created_at,
-            updated_at: users.updated_at,
-            so_don_order: sql`COALESCE((SELECT COUNT(*) FROM orders WHERE orders.user_id = ${users.id}), 0)`,
-            so_don_da_nap: sql`COALESCE((SELECT COUNT(*) FROM orders WHERE orders.user_id_nap = ${users.id} AND orders.status = 'success'), 0)`,
-            tong_amount: sql`COALESCE((SELECT SUM(amount) FROM topup_wallet_logs WHERE topup_wallet_logs.user_id = ${users.id} AND topup_wallet_logs.status = ${'Thành Công'}), 0)`
-        }).from(users).where(sql`1=1`);
-
+        // Use raw SQL for complex subqueries to avoid Drizzle context issues
+        let conditions = [];
+        let params = [];
 
         if (role) {
-            query.where(eq(users.role, role));
+            conditions.push("u.role = ?");
+            params.push(role);
         }
 
         if (keyword) {
-            const searchTerm = `%${keyword}%`;
-            query.where(or(ilike(users.name, searchTerm), ilike(users.email, searchTerm)));
+            conditions.push("(u.name LIKE ? OR u.email LIKE ?)");
+            params.push(`%${keyword}%`, `%${keyword}%`);
         }
 
-        const result = await query;
+        const whereClause = conditions.length > 0 ? "WHERE " + conditions.join(" AND ") : "";
+
+        const rawQuery = sql.raw(`
+            SELECT 
+                u.id, u.name, u.email, u.hash_password, u.role, u.level, u.balance, u.status, u.created_at, u.updated_at,
+                COALESCE((SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id AND o.status = 'success'), 0) as so_don_order,
+                COALESCE((SELECT COUNT(*) FROM topup_wallet_logs tw WHERE tw.user_id = u.id AND tw.status = 'Thành Công'), 0) as so_don_da_nap,
+                COALESCE((SELECT SUM(amount) FROM topup_wallet_logs tw WHERE tw.user_id = u.id AND tw.status = 'Thành Công'), 0) as tong_amount
+            FROM users u
+            ${whereClause}
+        `);
+
+        // Drizzle executes raw sql with parameters differently depending on driver, 
+        // but sql.raw usually takes the string. 
+        // Better approach with Drizzle: db.execute(sql`...`) using template literal for params.
+
+        let querySql;
+        if (role && keyword) {
+            querySql = sql`
+                SELECT 
+                    u.id, u.name, u.email, u.hash_password, u.role, u.level, u.balance, u.status, u.created_at, u.updated_at,
+                    COALESCE((SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id AND o.status = 'success'), 0) as so_don_order,
+                    COALESCE((SELECT COUNT(*) FROM topup_wallet_logs tw WHERE tw.user_id = u.id AND tw.status = 'Thành Công'), 0) as so_don_da_nap,
+                    COALESCE((SELECT SUM(amount) FROM topup_wallet_logs tw WHERE tw.user_id = u.id AND tw.status = 'Thành Công'), 0) as tong_amount
+                FROM users u
+                WHERE u.role = ${role} AND (u.name LIKE ${`%${keyword}%`} OR u.email LIKE ${`%${keyword}%`})
+            `;
+        } else if (role) {
+            querySql = sql`
+                SELECT 
+                    u.id, u.name, u.email, u.hash_password, u.role, u.level, u.balance, u.status, u.created_at, u.updated_at,
+                    COALESCE((SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id AND o.status = 'success'), 0) as so_don_order,
+                    COALESCE((SELECT COUNT(*) FROM topup_wallet_logs tw WHERE tw.user_id = u.id AND tw.status = 'Thành Công'), 0) as so_don_da_nap,
+                    COALESCE((SELECT SUM(amount) FROM topup_wallet_logs tw WHERE tw.user_id = u.id AND tw.status = 'Thành Công'), 0) as tong_amount
+                FROM users u
+                WHERE u.role = ${role}
+            `;
+        } else if (keyword) {
+            querySql = sql`
+                SELECT 
+                    u.id, u.name, u.email, u.hash_password, u.role, u.level, u.balance, u.status, u.created_at, u.updated_at,
+                    COALESCE((SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id AND o.status = 'success'), 0) as so_don_order,
+                    COALESCE((SELECT COUNT(*) FROM topup_wallet_logs tw WHERE tw.user_id = u.id AND tw.status = 'Thành Công'), 0) as so_don_da_nap,
+                    COALESCE((SELECT SUM(amount) FROM topup_wallet_logs tw WHERE tw.user_id = u.id AND tw.status = 'Thành Công'), 0) as tong_amount
+                FROM users u
+                WHERE (u.name LIKE ${`%${keyword}%`} OR u.email LIKE ${`%${keyword}%`})
+            `;
+        } else {
+            querySql = sql`
+                SELECT 
+                    u.id, u.name, u.email, u.hash_password, u.role, u.level, u.balance, u.status, u.created_at, u.updated_at,
+                    COALESCE((SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id AND o.status = 'success'), 0) as so_don_order,
+                    COALESCE((SELECT COUNT(*) FROM topup_wallet_logs tw WHERE tw.user_id = u.id AND tw.status = 'Thành Công'), 0) as so_don_da_nap,
+                    COALESCE((SELECT SUM(amount) FROM topup_wallet_logs tw WHERE tw.user_id = u.id AND tw.status = 'Thành Công'), 0) as tong_amount
+                FROM users u
+            `;
+        }
+
+        const [result] = await db.execute(querySql);
+
+        if (result.length > 0) {
+            // console.log("[SearchUser] Sample User Stats:", result[0]);
+        }
         return { success: true, users: result };
     },
 

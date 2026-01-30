@@ -200,40 +200,36 @@ class NapGame247Service {
                 .where(eq(games.id, existingGame.id));
         }
 
-        // 2. Sync Packges (Items)
+        // 2. Sync Packages (Items)
         const items = targetGameData.items || [];
         console.log(`Found ${items.length} items.`);
 
         for (const item of items) {
-            // Check if package exists for this game AND has the same name
-            const [existingPackage] = await db.select().from(topupPackages).where(
+            // Match by api_id to avoid duplicates
+            let [existingPackage] = await db.select().from(topupPackages).where(
                 and(
                     eq(topupPackages.game_id, existingGame.id),
-                    eq(topupPackages.package_name, item.name)
+                    eq(topupPackages.api_id, item.id)
                 )
             );
 
-            // Get game markup and profit percentages
-            // Step 1: Calculate origin price from API price
+            // Fallback: match by name if api_id not found (for legacy data)
+            if (!existingPackage) {
+                [existingPackage] = await db.select().from(topupPackages).where(
+                    and(
+                        eq(topupPackages.game_id, existingGame.id),
+                        eq(topupPackages.package_name, item.name)
+                    )
+                );
+            }
+
+            // Calculate origin price from API price
             const apiPrice = item.price;
-            // Treat origin_markup_percent as percentage (e.g. 10 = 10% -> 1.1 multiplier)
-            // If it's 0 or null, markup is 0% -> mulitplier 1
             const markupPercent = existingGame.origin_markup_percent || 0;
             const originPrice = Math.ceil(apiPrice * (1 + markupPercent / 100));
 
-            // Default profit percentages if not set (or fetch from existingGame/Config if available)
-            // Assuming these should come from existingGame or default values
-            const percentBasic = existingGame.profit_percent_basic || 0;
-            const percentPro = existingGame.profit_percent_pro || 0;
-            const percentPlus = existingGame.profit_percent_plus || 0;
-
-            // Step 2: Calculate selling prices from origin price
-            const priceBasic = Math.ceil(originPrice * (1 + percentBasic / 100));
-            const pricePro = Math.ceil(originPrice * (1 + percentPro / 100));
-            const pricePlus = Math.ceil(originPrice * (1 + percentPlus / 100));
-
             if (existingPackage) {
-                // Update package
+                // UPDATE: Only update API-related fields, preserve manual settings
                 console.log(`Updating package: ${item.name} - API: ${apiPrice}, Origin: ${originPrice}`);
 
                 await db.update(topupPackages)
@@ -241,19 +237,22 @@ class NapGame247Service {
                         api_id: item.id,
                         api_price: apiPrice,
                         origin_price: originPrice,
-                        price: priceBasic,
-                        price_basic: priceBasic,
-                        price_pro: pricePro,
-                        price_plus: pricePlus,
-                        fileAPI: { nap_id: item.id, game_api_id: targetGameData.id },
-                        profit_percent_basic: percentBasic,
-                        profit_percent_pro: percentPro,
-                        profit_percent_plus: percentPlus
+                        fileAPI: { nap_id: item.id, game_api_id: targetGameData.id }
+                        // DO NOT update: profit_percent_*, price_*, package_name, status, etc.
                     })
                     .where(eq(topupPackages.id, existingPackage.id));
             } else {
-                // Create new package
-                console.log(`Creating package: ${item.name}`);
+                // CREATE: New package with full data
+                console.log(`Creating NEW package: ${item.name}`);
+
+                // Use game percentages for new packages
+                const percentBasic = existingGame.profit_percent_basic || 0;
+                const percentPro = existingGame.profit_percent_pro || 0;
+                const percentPlus = existingGame.profit_percent_plus || 0;
+
+                const priceBasic = Math.ceil(originPrice * (1 + percentBasic / 100));
+                const pricePro = Math.ceil(originPrice * (1 + percentPro / 100));
+                const pricePlus = Math.ceil(originPrice * (1 + percentPlus / 100));
 
                 await db.insert(topupPackages).values({
                     id: crypto.randomUUID(),
@@ -263,12 +262,10 @@ class NapGame247Service {
                     api_price: apiPrice,
                     origin_price: originPrice,
 
-                    // Percentages
                     profit_percent_basic: percentBasic,
                     profit_percent_pro: percentPro,
                     profit_percent_plus: percentPlus,
 
-                    // Calculated Prices
                     price: priceBasic,
                     price_basic: priceBasic,
                     price_pro: pricePro,

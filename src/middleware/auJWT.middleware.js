@@ -128,39 +128,37 @@ const checkIsAdmin = async (req, res, next) => {
 };
 
 // Middleware 4: Optional Auth - Lấy user info nếu có token, không bắt buộc login
+// Simplified: Nếu có lỗi gì -> mặc định level 1, không block request
 const optionalAuth = async (req, res, next) => {
-  let token;
-  const authHeader = req.headers.authorization;
-
-  req.userLevel = 1; // Default level 1 (basic) nếu không login
-
-  if (req.cookies && req.cookies.token) {
-    token = req.cookies.token;
-  } else if (authHeader && authHeader.startsWith("Bearer ")) {
-    token = authHeader.split(" ")[1];
-  }
-
-  if (!token) {
-    return next(); // Không có token -> user level 1
-  }
+  req.userLevel = 1; // Default level 1 (basic)
+  req.isAdmin = false;
 
   try {
-    const tokenResult = verifyToken(token);
+    let token = null;
 
-    if (!tokenResult.valid || !tokenResult.decoded) {
-      return next();
+    // Lấy token từ cookie hoặc header
+    if (req.cookies?.token) {
+      token = req.cookies.token;
+    } else if (req.headers.authorization?.startsWith("Bearer ")) {
+      token = req.headers.authorization.split(" ")[1];
     }
 
-    const userId = tokenResult.decoded.id;
+    if (!token) return next(); // Không có token -> level 1
+
+    const tokenResult = verifyToken(token);
+    if (!tokenResult.valid || !tokenResult.decoded) return next();
+
     req.user = tokenResult.decoded;
 
-    const user = await UserService.getUserById(userId);
+    // Lấy user level từ DB
+    const user = await UserService.getUserById(tokenResult.decoded.id);
     if (user) {
       req.userLevel = user.level || 1;
       req.isAdmin = user.role === 'admin';
     }
   } catch (err) {
-    console.error("❌ Lỗi optionalAuth:", err);
+    // Lỗi gì cũng bỏ qua, dùng default level 1
+    // console.error("optionalAuth error (ignored):", err.message);
   }
 
   next();

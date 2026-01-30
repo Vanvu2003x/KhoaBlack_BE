@@ -230,9 +230,11 @@ const OrderService = {
                 const serverId = accountInfo.server_id || accountInfo.server || '';
 
                 if (serviceId && userId) {
-                    console.log(`[OrderService] Forwarding to Morishop: service=${serviceId}, userId=${userId}, serverId=${serverId}`);
+                    // Generate unique idtrx with numbers only: {timestamp}{random6digits}
+                    const uniqueIdtrx = `${Date.now()}${Math.floor(100000 + Math.random() * 900000)}`;
+                    console.log(`[OrderService] Forwarding to Morishop: service=${serviceId}, userId=${userId}, serverId=${serverId}, idtrx=${uniqueIdtrx}`);
 
-                    const res = await MorishopService.buyItem(serviceId, userId, serverId, order.id.toString());
+                    const res = await MorishopService.buyItem(serviceId, userId, serverId, uniqueIdtrx);
                     console.log("[OrderService] Morishop Result:", JSON.stringify(res));
 
                     // Morishop returns { status: true, data: { id: "ORDER...", status: "pending" } }
