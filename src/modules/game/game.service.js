@@ -78,7 +78,7 @@ const GameService = {
                 const percentBasic = game.profit_percent_basic || 0;
                 const percentPro = game.profit_percent_pro || 0;
                 const percentPlus = game.profit_percent_plus || 0;
-                const originMarkup = (game.origin_markup_percent && game.origin_markup_percent > 0) ? game.origin_markup_percent : 1;
+                const originMarkupPercent = game.origin_markup_percent || 0;
 
                 // 2. Fetch all packages
                 const packages = await tx.select().from(topupPackages).where(eq(topupPackages.game_id, id));
@@ -87,8 +87,8 @@ const GameService = {
                 for (const pkg of packages) {
                     const apiPrice = pkg.api_price || 0;
 
-                    // Recalculate Origin Price based on new coefficient
-                    const originPrice = Math.ceil(apiPrice * originMarkup);
+                    // Recalculate Origin Price using percentage formula (same as sync logic)
+                    const originPrice = Math.ceil(apiPrice * (1 + originMarkupPercent / 100));
 
                     const priceBasic = Math.ceil(originPrice * (1 + percentBasic / 100));
                     const pricePro = Math.ceil(originPrice * (1 + percentPro / 100));
