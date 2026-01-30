@@ -181,19 +181,14 @@ class MorishopService {
                 const pricePlus = Math.ceil(originPrice * (1 + percentPlus / 100));
 
                 if (existingPackage) {
-                    // Update package
+                    // UPDATE: Only update API-related fields, preserve manual settings
+                    console.log(`[Morishop] Updating package: ${packageName} - API: ${apiPrice}, Origin: ${originPrice}`);
                     await db.update(topupPackages)
                         .set({
                             api_price: apiPrice,
                             origin_price: originPrice,
-                            price: priceBasic,
-                            price_basic: priceBasic,
-                            price_pro: pricePro,
-                            price_plus: pricePlus,
-                            fileAPI: { service_id: serviceId, api_source: 'morishop' },
-                            profit_percent_basic: percentBasic,
-                            profit_percent_pro: percentPro,
-                            profit_percent_plus: percentPlus
+                            fileAPI: { service_id: serviceId, api_source: 'morishop' }
+                            // DO NOT update: profit_percent_*, price_*, package_name, status, etc.
                         })
                         .where(eq(topupPackages.id, existingPackage.id));
                 } else {
