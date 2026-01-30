@@ -181,14 +181,29 @@ class MorishopService {
                 const pricePlus = Math.ceil(originPrice * (1 + percentPlus / 100));
 
                 if (existingPackage) {
-                    // UPDATE: Only update API-related fields, preserve manual settings
-                    console.log(`[Morishop] Updating package: ${packageName} - API: ${apiPrice}, Origin: ${originPrice}`);
+                    // UPDATE: Recalculate prices from new origin_price using existing package percentages
+                    const pkgPercentBasic = existingPackage.profit_percent_basic ?? percentBasic;
+                    const pkgPercentPro = existingPackage.profit_percent_pro ?? percentPro;
+                    const pkgPercentPlus = existingPackage.profit_percent_plus ?? percentPlus;
+                    const pkgPercentUser = existingPackage.profit_percent_user ?? 0;
+
+                    const newPriceBasic = Math.ceil(originPrice * (1 + pkgPercentBasic / 100));
+                    const newPricePro = Math.ceil(originPrice * (1 + pkgPercentPro / 100));
+                    const newPricePlus = Math.ceil(originPrice * (1 + pkgPercentPlus / 100));
+                    const newPriceUser = Math.ceil(originPrice * (1 + pkgPercentUser / 100));
+
+                    console.log(`[Morishop] Updating package: ${packageName} - API: ${apiPrice}, Origin: ${originPrice}, Basic: ${newPriceBasic}, Pro: ${newPricePro}, Plus: ${newPricePlus}`);
+
                     await db.update(topupPackages)
                         .set({
                             api_price: apiPrice,
                             origin_price: originPrice,
+                            price: newPriceUser > originPrice ? newPriceUser : newPriceBasic,
+                            price_basic: newPriceBasic,
+                            price_pro: newPricePro,
+                            price_plus: newPricePlus,
                             fileAPI: { service_id: serviceId, api_source: 'morishop' }
-                            // DO NOT update: profit_percent_*, price_*, package_name, status, etc.
+                            // Preserve: profit_percent_*, package_name, status, etc.
                         })
                         .where(eq(topupPackages.id, existingPackage.id));
                 } else {
