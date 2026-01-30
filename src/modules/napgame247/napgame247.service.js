@@ -223,10 +223,10 @@ class NapGame247Service {
                 );
             }
 
-            // Calculate origin price from API price
+            // Calculate origin price from API price (markupCoefficient is stored as multiplier, e.g. 1.55 = 55% markup)
             const apiPrice = item.price;
-            const markupPercent = existingGame.origin_markup_percent || 0;
-            const originPrice = Math.ceil(apiPrice * (1 + markupPercent / 100));
+            const markupCoefficient = existingGame.origin_markup_percent || 1;
+            const originPrice = Math.ceil(apiPrice * markupCoefficient);
 
             if (existingPackage) {
                 // UPDATE: Recalculate prices from new origin_price using existing package percentages
