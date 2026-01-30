@@ -42,7 +42,7 @@ const PaymentService = {
         const bankBin = "970422"; // MB Bank BIN code
         const bankName = "MB Bank";
         const stk = "2196979899";
-        const chusohuu = "KHOAKUDO3";
+        const chusohuu = "VO VAN KHOA";
 
         const Log = await addLogDirect({ user_id: user.id, amount });
 
@@ -90,7 +90,8 @@ const PaymentService = {
 
                         if (log && (log.status === 'pending' || log.status === 'Đang Chờ')) {
                             // Update Wallet
-                            await UserService.updateBalance(log.user_id, value.amount, 'credit', 'Nạp tiền qua ngân hàng (Auto)');
+                            const amount = Number(value.amount);
+                            await UserService.updateBalance(log.user_id, amount, 'credit', 'Nạp tiền qua ngân hàng (Auto)');
 
                             // Update Log
                             await db.update(walletLogs)
