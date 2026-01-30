@@ -49,9 +49,9 @@ const StatisticsController = {
                     sold_count: count(orders.id).as('sold_count')
                 })
                 .from(orders)
-                .leftJoin(topupPackages, eq(orders.package_id, topupPackages.id))
-                .leftJoin(games, eq(topupPackages.game_id, games.id))
-                .where(eq(orders.status, 'success'))
+                .innerJoin(topupPackages, eq(orders.package_id, topupPackages.id))
+                .innerJoin(games, eq(topupPackages.game_id, games.id))
+                .where(sql`${orders.status} = 'success' AND ${topupPackages.price} > 0`)
                 .groupBy(topupPackages.id)
                 .orderBy(desc(sql`sold_count`))
                 .limit(5);
