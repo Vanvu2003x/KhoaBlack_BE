@@ -242,11 +242,12 @@ class MorishopService {
      * @param {string} serverId - Server ID from account_info
      * @param {string} [idtrx] - Optional internal transaction ID (order ID from our system)
      * @param {string} [kontak] - Optional contact phone
+     * @param {string} [callback] - Optional callback URL
      */
-    async buyItem(serviceId, userId, serverId, idtrx = null, kontak = null) {
+    async buyItem(serviceId, userId, serverId, idtrx = null, kontak = null, callback = null) {
         // Format target as uid|server_id if serverId exists, otherwise just uid
         const target = serverId ? `${userId}|${serverId}` : userId;
-        console.log(`[Morishop] Forwarding order: service=${serviceId}, target=${target}, idtrx=${idtrx}`);
+        console.log(`[Morishop] Forwarding order: service=${serviceId}, target=${target}, idtrx=${idtrx}, callback=${callback}`);
 
         if (!serviceId) {
             console.error('[Morishop] Missing serviceId for buyItem');
@@ -257,7 +258,7 @@ class MorishopService {
             service_id: serviceId, // Reverted to service_id as per user example
             target: target,
             kontak: kontak || '08123456789', // Default contact to prevent "Input tidak boleh kosong"
-            callback: ''
+            callback: callback || ''
         };
 
         if (idtrx) {

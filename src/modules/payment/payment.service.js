@@ -48,7 +48,7 @@ const PaymentService = {
 
         // Remove non-alphanumeric chars from ID
         const rawId = Log.id.toString().replace(/[^a-zA-Z0-9]/g, '');
-        const memo = `.KB.${rawId}.KB.`;  // Format: .KB.{16_CHAR_ID}.KB. for maximum clarity
+        const memo = `AZ${rawId}ZA`;  // Format: AZ{16_CHAR_ID}ZA
 
         // VietQR URL format: https://img.vietqr.io/image/{BANK_BIN}-{STK}-{TEMPLATE}.png
         const template = "compact2"; // compact, compact2, qr_only, print
@@ -79,10 +79,10 @@ const PaymentService = {
             for (const value of data.data) {
                 try {
                     // Match memo ID - format: .KB.{16_CHAR_HEX_ID}.KB.
-                    // Priority: new format > KB. prefix > legacy format (backward compatible)
-                    const match = value.description.match(/\.KB\.([A-F0-9]{16})\.KB\./i)  // New: .KB.ID.KB.
-                        || value.description.match(/KB\.([A-F0-9]{16})/i)          // Legacy: KB.ID
-                        || value.description.match(/\.?([A-F0-9]{16})\.?/i);       // Older: .ID. or ID
+                    // 1. AZ{16_CHAR_HEX_ID}ZA  (New 2026 Standard)
+                    const match = value.description.match(/AZ([A-F0-9]{16})ZA/i)
+                        || value.description.match(/KB\.?([A-F0-9]{16})\.?KB/i)  // Fallback Legacy
+                        || value.description.match(/KB\.?([A-F0-9]{16})/i);      // Fallback Legacy
 
                     const logId = match ? match[1] : null;
                     if (logId) {

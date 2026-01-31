@@ -230,11 +230,12 @@ const OrderService = {
                 const serverId = accountInfo.server_id || accountInfo.server || '';
 
                 if (serviceId && userId) {
-                    // Generate unique idtrx with numbers only: {timestamp}{random6digits}
-                    const uniqueIdtrx = `${Date.now()}${Math.floor(100000 + Math.random() * 900000)}`;
-                    console.log(`[OrderService] Forwarding to Morishop: service=${serviceId}, userId=${userId}, serverId=${serverId}, idtrx=${uniqueIdtrx}`);
+                    // Generate deterministic idtrx: KB_{order.id}
+                    const uniqueIdtrx = `KB_${order.id}`;
+                    const callbackUrl = `${process.env.FRONTEND_URL}/api/callback/morishop`;
+                    console.log(`[OrderService] Forwarding to Morishop: service=${serviceId}, userId=${userId}, serverId=${serverId}, idtrx=${uniqueIdtrx}, callback=${callbackUrl}`);
 
-                    const res = await MorishopService.buyItem(serviceId, userId, serverId, uniqueIdtrx);
+                    const res = await MorishopService.buyItem(serviceId, userId, serverId, uniqueIdtrx, null, callbackUrl);
                     console.log("[OrderService] Morishop Result:", JSON.stringify(res));
 
                     // Morishop returns { status: true, data: { id: "ORDER...", status: "pending" } }

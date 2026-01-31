@@ -83,6 +83,7 @@ app.use('/api/toup-package', toup_packageRoute);
 app.use('/api/acc', accRoute);
 app.use('/api/accOrder', accOrdersRoute);
 app.use('/api/morishop', require('./modules/morishop/morishop.route.js'));
+app.use('/api/callback', require('./modules/callback/callback.route.js'));
 app.use('/api/tools', require('./modules/toolsgame/toolsgame.route.js'));
 
 // Error Handling Middleware
