@@ -86,7 +86,7 @@ const PackageService = {
 
         // Fetch Game Settings for Pricing
         const [game] = await db.select().from(games).where(eq(games.id, data.game_id));
-        if (!game) throw new Error("Game not found");
+        if (!game) throw { status: 404, message: "Game not found" };
 
         const originPrice = parseInt(data.origin_price || 0);
 
@@ -149,11 +149,11 @@ const PackageService = {
 
     updatePackage: async (id, data, file) => {
         const currentPkg = await PackageService.getPackageById(id);
-        if (!currentPkg) throw new Error("Gói không tồn tại");
+        if (!currentPkg) throw { status: 404, message: "Gói không tồn tại" };
 
         // Fetch Game to get current percentages
         const [game] = await db.select().from(games).where(eq(games.id, currentPkg.game_id));
-        if (!game) throw new Error("Game associated with this package not found");
+        if (!game) throw { status: 404, message: "Game associated with this package not found" };
 
         const updateData = {};
         if (data.package_name !== undefined) updateData.package_name = data.package_name;
@@ -211,7 +211,7 @@ const PackageService = {
         }
 
         if (Object.keys(updateData).length === 0) {
-            throw new Error("Không có dữ liệu nào để cập nhật");
+            throw { status: 400, message: "Không có dữ liệu nào để cập nhật" };
         }
 
         await db.update(topupPackages).set(updateData).where(eq(topupPackages.id, id));

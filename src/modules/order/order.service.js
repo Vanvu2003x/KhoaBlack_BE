@@ -543,7 +543,7 @@ const OrderService = {
 
     cancelOrderAndRefund: async (id) => {
         const order = await OrderService.getOrderById(id);
-        if (!order) throw new Error("Not found");
+        if (!order) throw { status: 404, message: "Đơn hàng không tồn tại" };
 
         await db.update(orders).set({ status: 'cancelled', updated_at: new Date() }).where(eq(orders.id, id));
 

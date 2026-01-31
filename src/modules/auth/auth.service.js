@@ -14,6 +14,12 @@ const AuthService = {
             throw { status: 400, message: "Tên, Email và mật khẩu là bắt buộc." };
         }
 
+        // Check duplicate email
+        const [existingUser] = await db.select().from(users).where(eq(users.email, data.email));
+        if (existingUser) {
+            throw { status: 409, message: "Email đã tồn tại." };
+        }
+
         if (!data.otp) {
             throw { status: 400, message: "OTP là bắt buộc." };
         }

@@ -39,14 +39,23 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-app.use(helmet()); // Security headers
+
+// Handle preflight requests explicitly (before any other middleware)
+app.options('*', cors(corsOptions));
+
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+})); // Security headers
 app.use(cookieParser());
 
 app.use(express.json());
 
-// ✅ Rate Limiting
+// ✅ Rate Limiting (skip OPTIONS requests)
 const { generalLimiter } = require('./middleware/rateLimit.middleware');
-app.use('/api', generalLimiter); // Apply general limiter to all API routes
+app.use('/api', (req, res, next) => {
+  if (req.method === 'OPTIONS') return next(); // Skip rate limit for preflight
+  generalLimiter(req, res, next);
+});
 
 // ✅ Static file
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));

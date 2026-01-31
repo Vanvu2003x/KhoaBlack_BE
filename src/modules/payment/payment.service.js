@@ -48,7 +48,7 @@ const PaymentService = {
 
         // Remove non-alphanumeric chars from ID
         const rawId = Log.id.toString().replace(/[^a-zA-Z0-9]/g, '');
-        const memo = `${rawId}`;
+        const memo = `.KB.${rawId}.KB.`;  // Format: .KB.{16_CHAR_ID}.KB. for maximum clarity
 
         // VietQR URL format: https://img.vietqr.io/image/{BANK_BIN}-{STK}-{TEMPLATE}.png
         const template = "compact2"; // compact, compact2, qr_only, print
@@ -78,11 +78,11 @@ const PaymentService = {
         if (data.status === true && Array.isArray(data.data)) {
             for (const value of data.data) {
                 try {
-                    // Match memo ID - supports both old format (.ID.) and new format (ID only)
-                    const match = value.description.match(/\.?([A-F0-9]{16})\.?/i);
-                    // Actually let's trust original regex logic if valid: /\.(.*?)\.-/ 
-                    // But if description is ".XYZ." it might not match ".-"
-                    // Let's assume description format matches generated memo: `.${rawId}.`
+                    // Match memo ID - format: .KB.{16_CHAR_HEX_ID}.KB.
+                    // Priority: new format > KB. prefix > legacy format (backward compatible)
+                    const match = value.description.match(/\.KB\.([A-F0-9]{16})\.KB\./i)  // New: .KB.ID.KB.
+                        || value.description.match(/KB\.([A-F0-9]{16})/i)          // Legacy: KB.ID
+                        || value.description.match(/\.?([A-F0-9]{16})\.?/i);       // Older: .ID. or ID
 
                     const logId = match ? match[1] : null;
                     if (logId) {
