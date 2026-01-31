@@ -62,8 +62,8 @@ const THEME = {
 
 // Logo attachment
 const logoAttachment = {
-    filename: 'logo.ico',
-    path: path.join(process.cwd(), 'src/uploads/logo.ico'),
+    filename: 'logo.png',
+    path: path.join(process.cwd(), 'src/uploads/logo.png'),
     cid: 'logo'
 };
 
@@ -176,7 +176,7 @@ function baseTemplate(options = {}) {
                                         <span style="color: ${THEME.borderAccent};">•</span>
                                         <a href="https://khoablacktopup.vn/user/history" style="color: ${THEME.primary}; text-decoration: none; font-size: 14px; margin: 0 12px;">Lịch sử</a>
                                         <span style="color: ${THEME.borderAccent};">•</span>
-                                        <a href="https://khoablacktopup.vn/support" style="color: ${THEME.primary}; text-decoration: none; font-size: 14px; margin: 0 12px;">Hỗ trợ</a>
+                                        <a href="https://www.facebook.com/profile.php?id=61586972106424" style="color: ${THEME.primary}; text-decoration: none; font-size: 14px; margin: 0 12px;">Hỗ trợ</a>
                                     </td>
                                 </tr>
                                 <!-- Copyright -->
@@ -283,7 +283,7 @@ async function sendOTP(email, otp) {
         });
 
         const info = await transporter.sendMail({
-            from: '"KhoaBlackTopup" <napgameuytin2111@gmail.com>',
+            from: `"KhoaBlackTopup" <${process.env.SMTP_USER}>`,
             to: email,
             subject: "🚀 Mã xác minh đăng ký tài khoản",
             html,
@@ -370,7 +370,7 @@ async function sendOTPRePass(email, otp) {
         });
 
         const info = await transporter.sendMail({
-            from: '"KhoaBlackTopup Security" <napgameuytin2111@gmail.com>',
+            from: `"KhoaBlackTopup" <${process.env.SMTP_USER}>`,
             to: email,
             subject: "🔐 [CẢNH BÁO] Mã khôi phục mật khẩu",
             html,
@@ -558,7 +558,7 @@ async function sendAcc(email, data, order) {
         `.trim();
 
         const info = await transporter.sendMail({
-            from: '"KhoaBlackTopup" <napgameuytin2111@gmail.com>',
+            from: `"KhoaBlackTopup" <${process.env.SMTP_USER}>`,
             to: email,
             subject: `🎁 [TÀI KHOẢN MỚI] Giao hàng thành công: Đơn hàng #${order.id}`,
             html,
@@ -689,7 +689,7 @@ async function sendStatus(email, order) {
                 <tr>
                     <td align="center">
                         <p style="margin: 0; color: ${THEME.textMuted}; font-size: 13px;">
-                            Cần hỗ trợ? <a href="https://khoablacktopup.vn/support" style="color: ${THEME.primary}; text-decoration: none;">Chat ngay</a> hoặc phản hồi email này.
+                            Cần hỗ trợ? <a href="https://m.me/939588092574339" style="color: ${THEME.primary}; text-decoration: none;">Chat ngay</a> hoặc phản hồi email này.
                         </p>
                     </td>
                 </tr>
@@ -705,7 +705,7 @@ async function sendStatus(email, order) {
         });
 
         const info = await transporter.sendMail({
-            from: '"KhoaBlackTopup Support" <napgameuytin2111@gmail.com>',
+            from: `"KhoaBlackTopup" <${process.env.SMTP_USER}>`,
             to: email,
             subject: `🔔 Đơn hàng #${order.id}: ${status.text.toUpperCase()}`,
             html,
@@ -829,7 +829,7 @@ async function sendAdminBalanceOTP(email, otp) {
         });
 
         const info = await transporter.sendMail({
-            from: '"Napgameuytin Admin" <napgameuytin2111@gmail.com>',
+            from: `"KhoaBlackTopup" <${process.env.SMTP_USER}>`,
             to: email,
             subject: "👑 [ADMIN] Mã xác thực thao tác số dư",
             html,
@@ -979,7 +979,7 @@ async function sendRolePromotionOTP(email, otp, targetUserEmail, newRole) {
         });
 
         const info = await transporter.sendMail({
-            from: '"Napgameuytin Admin" <napgameuytin2111@gmail.com>',
+            from: `"KhoaBlackTopup" <${process.env.SMTP_USER}>`,
             to: email,
             subject: `🎖️ [ADMIN] Xác thực thăng cấp ${roleInfo.text}`,
             html,
@@ -1070,7 +1070,7 @@ async function sendOrderSuccessEmail(email, orderData) {
                             <!-- Greeting -->
                             <p style="margin: 0 0 25px 0; color: #e2e8f0; font-size: 16px; line-height: 1.7;">
                                 Xin chào <strong style="color: #34d399;">${orderData.user_name || 'Quý khách'}</strong>,<br>
-                                Cảm ơn bạn đã tin tưởng sử dụng dịch vụ tại <strong style="color: #ffffff;">Napgameuytin</strong>! 🎮
+                                Cảm ơn bạn đã tin tưởng sử dụng dịch vụ tại <strong style="color: #ffffff;">KhoaBlackTopup</strong>! 🎮
                             </p>
 
                             <!-- Receipt Card -->
@@ -1157,7 +1157,7 @@ async function sendOrderSuccessEmail(email, orderData) {
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr>
                                     <td align="center">
-                                        <a href="https://napgameuytin.vn/account?tab=order-history" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #FFFFFF; padding: 18px 45px; border-radius: 50px; text-decoration: none; font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4);">
+                                        <a href="https://khoablacktopup.vn/account?tab=order-history" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #FFFFFF; padding: 18px 45px; border-radius: 50px; text-decoration: none; font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 10px 25px rgba(16, 185, 129, 0.4);">
                                             📋 Xem lịch sử đơn hàng
                                         </a>
                                     </td>
@@ -1172,14 +1172,14 @@ async function sendOrderSuccessEmail(email, orderData) {
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr>
                                     <td align="center" style="padding-bottom: 15px;">
-                                        <img src="cid:logo" alt="Napgameuytin" style="height: 35px; border-radius: 8px; opacity: 0.9;">
+                                        <img src="cid:logo" alt="KhoaBlackTopup" style="height: 35px; border-radius: 8px; opacity: 0.9;">
                                     </td>
                                 </tr>
                                 <tr>
                                     <td align="center">
                                         <p style="margin: 0; color: #64748b; font-size: 12px; line-height: 1.8;">
-                                            Cần hỗ trợ? <a href="https://napgameuytin.vn/support" style="color: #10b981; text-decoration: none;">Liên hệ ngay</a><br>
-                                            © 2026 Napgameuytin.vn - Nạp game uy tín hàng đầu Việt Nam
+                                            Cần hỗ trợ? <a href="https://www.facebook.com/profile.php?id=61586972106424" style="color: #10b981; text-decoration: none;">Liên hệ ngay</a><br>
+                                            © 2026 KhoaBlackTopup.vn - Nạp game uy tín hàng đầu Việt Nam
                                         </p>
                                     </td>
                                 </tr>
@@ -1198,7 +1198,7 @@ async function sendOrderSuccessEmail(email, orderData) {
         `.trim();
 
         const info = await transporter.sendMail({
-            from: '"Napgameuytin" <napgameuytin2111@gmail.com>',
+            from: `"KhoaBlackTopup" <${process.env.SMTP_USER}>`,
             to: email,
             subject: `🎉 Đơn hàng #${orderData.id} thành công! - ${orderData.package_name || 'Nạp game'}`,
             html,
@@ -1366,14 +1366,14 @@ async function sendOrderFailureEmail(email, orderData, reason = "Đơn hàng đ�
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr>
                                     <td align="center" style="padding-bottom: 12px;">
-                                        <a href="https://napgameuytin.vn/account?tab=order-history" style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #FFFFFF; padding: 16px 40px; border-radius: 50px; text-decoration: none; font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 10px 25px rgba(245, 158, 11, 0.3);">
+                                        <a href="https://khoablacktopup.vn/account?tab=order-history" style="display: inline-block; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: #FFFFFF; padding: 16px 40px; border-radius: 50px; text-decoration: none; font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 10px 25px rgba(245, 158, 11, 0.3);">
                                             📋 Xem lịch sử
                                         </a>
                                     </td>
                                 </tr>
                                 <tr>
                                     <td align="center">
-                                        <a href="https://napgameuytin.vn" style="display: inline-block; background: transparent; border: 2px solid #78716c; color: #d6d3d1; padding: 14px 35px; border-radius: 50px; text-decoration: none; font-weight: 600; font-size: 13px;">
+                                        <a href="https://khoablacktopup.vn" style="display: inline-block; background: transparent; border: 2px solid #78716c; color: #d6d3d1; padding: 14px 35px; border-radius: 50px; text-decoration: none; font-weight: 600; font-size: 13px;">
                                             🔄 Đặt đơn mới
                                         </a>
                                     </td>
@@ -1390,7 +1390,7 @@ async function sendOrderFailureEmail(email, orderData, reason = "Đơn hàng đ�
                                     <td align="center">
                                         <p style="margin: 0; color: #a8a29e; font-size: 14px; line-height: 1.7;">
                                             Cần hỗ trợ? Đội ngũ chúng tôi luôn sẵn sàng giúp đỡ bạn!<br>
-                                            <a href="https://napgameuytin.vn/support" style="color: #fbbf24; text-decoration: none; font-weight: 600;">💬 Chat với hỗ trợ viên</a>
+                                            <a href="https://m.me/939588092574339" style="color: #fbbf24; text-decoration: none; font-weight: 600;">💬 Chat với hỗ trợ viên</a>
                                         </p>
                                     </td>
                                 </tr>
@@ -1404,13 +1404,13 @@ async function sendOrderFailureEmail(email, orderData, reason = "Đơn hàng đ�
                             <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
                                 <tr>
                                     <td align="center" style="padding-bottom: 15px;">
-                                        <img src="cid:logo" alt="Napgameuytin" style="height: 35px; border-radius: 8px; opacity: 0.8;">
+                                        <img src="cid:logo" alt="KhoaBlackTopup" style="height: 35px; border-radius: 8px; opacity: 0.8;">
                                     </td>
                                 </tr>
                                 <tr>
                                     <td align="center">
                                         <p style="margin: 0; color: #57534e; font-size: 12px; line-height: 1.8;">
-                                            © 2026 Napgameuytin.vn - Nạp game uy tín hàng đầu Việt Nam<br>
+                                            © 2026 KhoaBlackTopup.vn - Nạp game uy tín hàng đầu Việt Nam<br>
                                             Đây là email tự động, vui lòng không trả lời trực tiếp.
                                         </p>
                                     </td>
@@ -1430,7 +1430,7 @@ async function sendOrderFailureEmail(email, orderData, reason = "Đơn hàng đ�
         `.trim();
 
         const info = await transporter.sendMail({
-            from: '"Napgameuytin Support" <napgameuytin2111@gmail.com>',
+            from: `"KhoaBlackTopup" <${process.env.SMTP_USER}>`,
             to: email,
             subject: `⚠️ Đơn hàng #${orderData.id} đã bị hủy - Hoàn tiền ${formattedPrice}`,
             html,
